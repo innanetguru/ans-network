@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
-'''This plugin is intended for use with ansible jinja2 templating to generate
+'''
+*** Currently under refactoring ***
+This plugin is intended for use with ansible jinja2 templating to generate
 tunnel interface ID's dynamically yet predictively based on existing device state.  
 The funcationlity of this plugin mirrors as closely as possible how
 a network operator might perform these actions manually i.e. login to device,
