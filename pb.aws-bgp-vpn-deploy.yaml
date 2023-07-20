@@ -1,0 +1,42 @@
+---
+- name: Deploy A New AWS VPN with BGP
+  hosts: "gns_dmvpn"
+  connection: network_cli
+  gather_facts: False 
+  serial: 5     # Required to run serially on a pair of vpn routers on prem to ensure dynamic tunnelid's
+  collections:
+    - cisco.ios
+  vars_files:
+    - vars.aws-bgp-vpn.yaml
+  tasks:
+    - name:  Gather Initial Interface Facts Pre-Deployment
+      cisco.ios.ios_facts:
+        #available_network_resources: True
+        gather_subset: "all"
+        #gather_network_resources: 'acls'
+      become: True
+
+    - name: Print Interfaces
+      ansible.builtin.debug:
+        msg: 
+          - "tunnel{{ ansible_net_interfaces | tunnelid(seed=jira, step=1, start=30, end=40) }}"
+          - "tunnel{{ ansible_net_interfaces | tunnelid(seed=jira, step=1, start=30, end=40) }}"
+      #when: "'Tunnel22' not in ansible_net_interfaces"
+      #loop: {{ somelist }}
+
+    - name: Render Config From Template
+      template:
+        src: ./templates/aws-cisco-vpn-bgp.j2
+        dest: ./config/{{ inventory_hostname }}.{{ jira }}.build.cfg
+
+    - name: Write pre-deployment running-config to config directory
+      copy:
+        content: "{{ ansible_net_config }}"
+        dest: "./config/{{ inventory_hostname }}.cfg"
+        owner: innanetguru
+        mode: 0644
+
+    - name: Deploy Service to Datacenter
+      ios_config:
+        src: ./config/{{ inventory_hostname}}.{{ jira }}.build.cfg
+      become: True

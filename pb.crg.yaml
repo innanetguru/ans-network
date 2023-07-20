@@ -1,0 +1,48 @@
+########## CRG Externalization Play#1 #########
+
+---
+- name: Deploy VIP
+  hosts: "elb01"
+  connection: local
+  gather_facts: no 
+  #pre-tasks:
+   # - include_vars: "{{ topology }}"
+   # - include: pb.f5facts.yaml
+
+  vars_prompt:
+    - name: username
+      prompt: Username
+      private: no 
+    - name: password 
+      prompt: Password 
+    - name: comment
+      prompt: Enter IM#/CR#/JIRA
+
+  roles:           #  Optional role creation for tasks such as "create-nodes", "create-pools", "import-certs" 
+    - crg-vip   # secure vip task container
+    #- http-redirect        # non-secure VIP task container
+    #- keyloader    --->> prerequisite step, keys must be uploaded and filenames known;  consider as "include: pb.keys.yaml"
+    #- keyFactory       # May require custom python modules to automate signing through sectigo API; not critical/blocker, keys generation/signing can be done manually
+
+########### CRG Externalization Play#2 ##########
+
+- name: Deploy External Access Policy 
+  hosts: "efw01"
+  collections:
+   - fortinet.fortios
+  connection: local 
+  gather_facts: no 
+  #pre-tasks:
+   # - include_vars: "{{ topology }}"
+
+  vars_files:
+    - keys.yaml
+    
+  vars_prompt:
+  - name: username
+    prompt: Username
+    private: no 
+  - name: password 
+    prompt: Password 
+  roles:
+    - crg-external-access   # container for tasks associated with firewall externalization

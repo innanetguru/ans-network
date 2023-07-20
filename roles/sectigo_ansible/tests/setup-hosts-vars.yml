@@ -1,0 +1,7 @@
+# Variables to setup the hosts used for the tests
+# We spin up 4 virtual machines with ubuntu 18.04 LTS, Centos 7.3, FreeBSD 11.3 and FreeBSD 12.0
+# Then we run the setup-hosts.yml playbook on these hosts
+---
+keypair_path: /home/vmartino/.ssh/ender
+bootstrap_preview: no
+bootstrap_remote_user: vmartino

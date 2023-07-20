@@ -1,0 +1,37 @@
+---
+# Check assertions on input parameters
+- name: Check key size
+  fail:
+    msg: Unsupported key size {{ sectigo_csr_key_size }}. Supported values are 2048, 3072 and 4096
+  when: sectigo_csr_key_size not in [2048, 3072, 4096]
+
+# Look for variables specified with environment variables
+- set_fact:
+    sectigo_cm_user: "{{ lookup('env', 'SECTIGO_CM_USER') }}"
+  no_log: true
+  when:
+    lookup('env', 'SECTIGO_CM_USER')
+
+- set_fact:
+    sectigo_cm_password: "{{ lookup('env', 'SECTIGO_CM_PASSWORD') }}"
+  no_log: true
+  when:
+    lookup('env', 'SECTIGO_CM_PASSWORD')
+
+- set_fact:
+    sectigo_cm_uri: "{{ lookup('env', 'SECTIGO_CM_URI') }}"
+  no_log: true
+  when:
+    lookup('env', 'SECTIGO_CM_URI')
+
+- set_fact:
+    sectigo_cm_org_id: "{{ lookup('env', 'SECTIGO_CM_ORG_ID') }}"
+  no_log: true
+  when:
+    lookup('env', 'SECTIGO_CM_ORG_ID')
+
+- set_fact:
+    sectigo_cm_base_url: "{{ lookup('env', 'SECTIGO_CM_BASE_URL') }}"
+  when:
+    lookup('env', 'SECTIGO_CM_BASE_URL')
+

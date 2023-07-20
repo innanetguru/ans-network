@@ -1,0 +1,182 @@
+---
+# Ensure mandatory parameters for enrollment are set (excluding those already checked to include these tasks)
+- name: Check mandatory parameters are set
+  assert:
+    that:
+      - sectigo_ssl_cert_type is defined
+      - sectigo_ssl_cert_validity is defined
+
+- name: Check csr fields are defined if sectigo_csr_subject and sectigo_csr are not defined
+  assert:
+    that:
+      - sectigo_csr_domain is defined
+      - sectigo_csr_country is defined
+      - sectigo_csr_location is defined
+      - sectigo_csr_organization is defined
+      - sectigo_csr_organization_unit is defined
+      - sectigo_csr_email_address is defined
+  when:
+      - sectigo_csr_subject is not defined
+      - sectigo_csr is not defined
+
+- name: Check if user provided {{ sectigo_csr }} file exists
+  stat:
+    path: "{{ sectigo_csr }}"
+  register: sectigo_csr_file
+  when: sectigo_csr is defined
+
+- name: Fail if {{ sectigo_csr }} file does not exist
+  fail:
+    msg: The file {{ sectigo_csr }} does not exist
+  when: sectigo_csr_file.stat is defined and not sectigo_csr_file.stat.exists
+
+- name: Generate private key
+  openssl_privatekey:
+    path: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.key"
+    type: "{{ sectigo_csr_key_algo }}"
+    size: "{{ sectigo_csr_key_size }}"
+    force: "{{ sectigo_force }}"
+  register: private_key
+  when:
+    - sectigo_csr is not defined
+
+- name: Check if private key backup file exists
+  stat:
+    path: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.key.bck"
+  register: sectigo_private_key_backup_file
+
+- name: restore backup if private key has changed but enrollment ids or certificate already exists
+  copy:
+    src: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.key.bck"
+    remote_src: yes
+    mode: preserve
+    dest: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.key"
+  when:
+    - private_key.changed
+    - not sectigo_force
+    - sectigo_private_key_backup_file.stat is defined and sectigo_private_key_backup_file.stat.exists
+    - (certificate_ids_file.stat is defined and certificate_ids_file.stat.exists) or
+      (certificate_crt_file.stat is defined and certificate_crt_file.stat.exists)
+
+- fail:
+    msg: A private key already exists and it has been used to enroll a certificate. Set sectigo_force:True to overwrite.
+  when:
+    - private_key.changed
+    - not sectigo_force
+    - (certificate_ids_file.stat is defined and certificate_ids_file.stat.exists) or
+      (certificate_crt_file.stat is defined and certificate_crt_file.stat.exists)
+
+- name: Show details of the generated private key
+  debug:
+    var: private_key
+    verbosity: 2
+
+- name: Generate CSR using the private key
+  openssl_csr:
+    path: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.csr"
+    privatekey_path: "{{ private_key['filename'] }}"
+    country_name: "{{ sectigo_csr_country }}"
+    state_or_province_name: "{{ sectigo_csr_state }}"
+    locality_name: "{{ sectigo_csr_location }}"
+    organization_name: "{{ sectigo_csr_organization }}"
+    organizational_unit_name: "{{ sectigo_csr_organization_unit }}"
+    email_address: "{{ sectigo_csr_email_address }}"
+    common_name: "{{ sectigo_csr_domain }}"
+    subject_alt_name: "{{ sectigo_ssl_cert_subject_alt_names | default(omit) }}"
+    force: "{{ sectigo_force }}"
+  register: csr_fields
+  when: sectigo_csr_subject is not defined and sectigo_csr is not defined
+
+- name: Generate CSR using the private key using the subject string
+  openssl_csr:
+    path: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.csr"
+    privatekey_path: "{{ private_key['filename'] }}"
+    subject: "{{ sectigo_csr_subject.split('/') | join(',') }}"
+    subject_alt_name: "{{ sectigo_ssl_cert_subject_alt_names | default(omit) }}"
+    force: "{{ sectigo_force }}"
+  register: csr_subject
+  when: sectigo_csr_subject is defined and sectigo_csr is not defined
+
+- set_fact:
+    csr: "{{ csr_fields }}"
+  when: csr_fields is not skipped
+
+- set_fact:
+    csr: "{{ csr_subject }}"
+  when: csr_subject is not skipped
+
+- name: Show details of the generated CSR
+  debug:
+    var: csr
+    verbosity: 2
+
+- name: Issue a new Sectigo SSL certificate from user provided csr
+  sectigo_ansible:
+    ca_base_url: "{{ sectigo_cm_base_url }}"
+    login: "{{ sectigo_cm_user }}"
+    password: "{{ sectigo_cm_password }}"
+    customer_uri: "{{ sectigo_cm_uri }}"
+    org_id: "{{ sectigo_cm_org_id }}"
+    force: "{{ sectigo_force }}"
+    state: "{{ sectigo_state }}"
+    cert_type: "{{ sectigo_ssl_cert_type }}"
+    term: "{{ sectigo_ssl_cert_validity }}"
+    csr: "{{ sectigo_csr }}"
+    format_type: "{{ sectigo_ssl_cert_format_type }}" # <2>
+    max_timeout: "{{ sectigo_max_timeout }}"
+    loop_period: "{{ sectigo_loop_period }}"
+    certificate_file_name: "{{ sectigo_ssl_cert_file_name }}"
+    certificate_path: "{{ sectigo_ssl_cert_file_path }}"  # <3>
+    subj_alt_names: "{{ sectigo_ssl_cert_subject_alt_names | default(omit) }}"
+    number_servers: "{{ sectigo_ssl_cert_num_servers }}"
+    server_type: "{{ sectigo_ssl_cert_server_type }}"
+    comments: "{{ sectigo_ssl_cert_comments }}"
+    external_requester: "{{ sectigo_ssl_cert_external_requester }}"
+    expiry_window: "{{ sectigo_ssl_cert_expiry_window }}"
+    auto_renew: "{{ sectigo_auto_renew }}"
+    custom_fields: "{{ sectigo_ssl_cert_custom_fields | default(omit) }}"
+  register: enrollment_user_provided # <4>
+  when: sectigo_csr is defined
+
+- name: Issue a new Sectigo SSL certificate from user provided subject fields
+  sectigo_ansible:
+    ca_base_url: "{{ sectigo_cm_base_url }}"
+    login: "{{ sectigo_cm_user }}"
+    password: "{{ sectigo_cm_password }}"
+    customer_uri: "{{ sectigo_cm_uri }}"
+    org_id: "{{ sectigo_cm_org_id }}"
+    force: "{{ sectigo_force }}"
+    state: "{{ sectigo_state }}"
+    cert_type: "{{ sectigo_ssl_cert_type }}"
+    term: "{{ sectigo_ssl_cert_validity }}"
+    csr: "{{ csr['filename'] }}"  # <1>
+    certificate_file_name: "{{ sectigo_ssl_cert_file_name }}"
+    format_type: "{{ sectigo_ssl_cert_format_type }}" # <2>
+    max_timeout: "{{ sectigo_max_timeout }}"
+    loop_period: "{{ sectigo_loop_period }}"
+    certificate_path: "{{ sectigo_ssl_cert_file_path }}"  # <3>
+    subj_alt_names: "{{ sectigo_ssl_cert_subject_alt_names | default(omit) }}"
+    number_servers: "{{ sectigo_ssl_cert_num_servers }}"
+    server_type: "{{ sectigo_ssl_cert_server_type }}"
+    comments: "{{ sectigo_ssl_cert_comments }}"
+    external_requester: "{{ sectigo_ssl_cert_external_requester }}"
+    expiry_window: "{{ sectigo_ssl_cert_expiry_window }}"
+    auto_renew: "{{ sectigo_auto_renew }}"
+    custom_fields: "{{ sectigo_ssl_cert_custom_fields | default(omit) }}"
+  register: enrollment_result_csr_generated # <4>
+  when:
+    - csr is defined and 'filename' in csr
+    - sectigo_csr is not defined
+
+- set_fact:
+    enrollment_result: "{{ enrollment_result_csr_generated }}"
+  when: enrollment_result_csr_generated is not skipped
+
+- set_fact:
+    enrollment_result: "{{ enrollment_user_provided }}"
+  when: enrollment_user_provided is not skipped
+
+- name: Show details of the generated certificate
+  debug:
+    var: enrollment_result
+    verbosity: 2

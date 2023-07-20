@@ -1,0 +1,133 @@
+---
+#- name: Fetch facts From node 1 in HA-pair
+ # hosts: "gns_lb"
+ # connection: local
+ # gather_facts: no 
+
+  #vars_prompt:
+  #- name: username
+   # prompt: Username
+   # private: no 
+  #- name: password 
+   # prompt: Password
+
+  #tasks:
+   # - name:  Load device facts
+    #  bigip_device_info:
+      #  provider: "{{ provider }}"
+      #  #validate_certs: no 
+      #  gather_subset:
+      #    - devices
+      #delegate_to: localhost
+      #register: facts
+
+    #- name: create facts file
+     # become: yes
+     # become_user: dgiardin
+     # copy: 
+      #  content: "{{ facts | to_nice_json }}"
+       # dest: "{{ inventory_hostname }}_facts.json"
+       # owner: awx
+       # mode: 0777
+
+
+    #- name: create hostvars file
+     # copy: 
+      #  content: "{{ hostvars[inventory_hostname] | to_nice_json }}"
+      #  dest: "{{ inventory_hostname }}_hostvars.json"
+      #  owner: awx
+      #  mode: 0777
+
+    #- name: Debug hostvars
+     # debug:
+      #  var: hostvars[inventory_hostname]
+ ###############################################################       
+- name: Deploy VIP
+  hosts: "gns_lb"
+  connection: local
+  #collections:
+   # - f5networks.f5_modules
+  gather_facts: no 
+  serial: 1
+
+  vars_files:
+    - roles/crg-vip/vars/main.yaml
+    - roles/crg-vip/defaults/main.yaml
+    #- keys.yaml
+
+  #vars:
+    #- l001_facts: "{{ lookup('file','bp2-ilb01-l001_facts.json') | from_json }}"
+    #- l002_facts: "{{ lookup('file','bp2-ilb01-l002_facts.json') | from_json }}"
+
+  #vars_prompt:
+  #- name: username
+   # prompt: Username
+   # private: no 
+  #- name: password 
+   # prompt: Password
+  #- name: comment
+   # prompt: Enter IM#/CR#/JIRA
+
+  tasks:
+    - name:  Load device facts
+      bigip_device_info:
+        provider: "{{ provider }}"
+        #validate_certs: no 
+        gather_subset:
+          - devices
+      delegate_to: localhost
+      register: facts
+      
+    - name: Delete PROD Virtual Server
+      bigip_virtual_server:
+        provider: "{{ provider }}"
+        state: absent
+        name: "{{ build_params.application_names.prod }}_https"  #  r1.0 passed in from -e @vars.yml
+        type: standard
+        source: 0.0.0.0/0
+        destination: "{{ build_params.shared_params.custGrpVips[1]['name'] }}"  # r1.0 passed in from -e @vars.yml
+        port: "{{ svc_port }}"          # https-application role-default
+        pool: "{{ build_params.bigip_params.pools.prod }}"
+        snat: automap
+        profiles:
+          - tcp
+          - name: "{{ build_params.custTag }}_ssl-profile"  #  r1.0 passed in from -e @vars.yml
+            context: client-side
+        enabled_vlans: "{{ vlans.frontend }}"
+      delegate_to: localhost
+
+    - name: Delete PROD application/service Pool    
+      bigip_pool:
+        provider: "{{ provider }}"
+        state: absent
+        name: "{{ build_params.bigip_params.pools.prod }}"    # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+        lb_method: "{{ lb_method }}"       # role default: round-robin, roles/https-application/defaults/main.yaml; override via extra-vars or role_vars
+        monitors: 
+          - http
+          - tcp     # role default: ['tcp', 'http']; override via extra-vars or role_vars
+        monitor_type:  and_list
+        partition: Common
+
+    - name: delete SSL Profile 
+      bigip_profile_client_ssl:
+        provider: "{{ provider }}"
+        state: absent
+        #delegate_to: localhost
+        name: "{{ build_params.custTag }}_ssl-profile"   #  r1.0 passed in from -e @vars.yml
+        cert_key_chain:
+          - cert: default.crt    #  r1.0 passed in from -e @vars.yml
+            key: default.key      #  r1.0 passed in from -e @vars.yml
+            chain: "{{ ca_chain }}"      #  role vars
+            
+    - name: Delete Production Nodes
+      bigip_node:
+        provider: "{{ provider }}"                        # Provider DICT in group_vars/all.yaml; arguments collected at runtime
+        state: absent
+        name: "{{ item.fqdn }}"                                # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+        fqdn: "{{ item.fqdn }}"                                # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+        #validate_certs: no
+      loop: "{{ build_params.server_params.prod }}"   # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+      #when: input.devices[0:1]['failover_state'] == 'active' and input.devices[0:1]['self'] == 'yes'
+
+
+

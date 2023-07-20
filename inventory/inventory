@@ -1,0 +1,107 @@
+[local_host]
+localhost ansible_host=127.0.0.1
+
+[dcnm]
+dcnm-g000 ansible_host=192.168.0.180 ansible_connection=httpapi ansible_network_os=cisco.dcnm.dcnm ansible_httpapi_validate_certs=False ansible_httpapi_use_ssl=True ansible_user=admin
+
+[fabric]
+lfsw01-g001 ansible_host=192.168.0.196
+lfsw01-g002 ansible_host=192.168.0.197
+lfsw02-g001 ansible_host=192.168.0.198
+lfsw02-g002 ansible_host=192.168.0.199
+lfsw03-g001 ansible_host=192.168.0.200
+lfsw03-g002 ansible_host=192.168.0.201
+lfsw04-g001 ansible_host=192.168.0.202
+lfsw04-g002 ansible_host=192.168.0.203
+lfsw05-g001 ansible_host=192.168.0.204
+lfsw05-g002 ansible_host=192.168.0.205
+lfsw06-g001 ansible_host=192.168.0.206
+lfsw06-g002 ansible_host=192.168.0.207
+lfsw07-g001 ansible_host=192.168.0.208
+lfsw07-g002 ansible_host=192.168.0.209
+lfsw08-g001 ansible_host=192.168.0.220
+lfsw08-g002 ansible_host=192.168.0.221
+spsw-g001 ansible_host=192.168.0.228
+spsw-g002 ansible_host=192.168.0.229
+spsw-g003 ansible_host=192.168.0.230
+spsw-g004 ansible_host=192.168.0.231
+
+[evpn_leaf]
+lfsw01-g001 ansible_host=192.168.0.196
+lfsw01-g002 ansible_host=192.168.0.197
+lfsw02-g001 ansible_host=192.168.0.198
+lfsw02-g002 ansible_host=192.168.0.199
+lfsw03-g001 ansible_host=192.168.0.200
+lfsw03-g002 ansible_host=192.168.0.201
+lfsw04-g001 ansible_host=192.168.0.202
+lfsw04-g002 ansible_host=192.168.0.203
+lfsw05-g001 ansible_host=192.168.0.204
+lfsw05-g002 ansible_host=192.168.0.205
+lfsw06-g001 ansible_host=192.168.0.206
+lfsw06-g002 ansible_host=192.168.0.207
+lfsw07-g001 ansible_host=192.168.0.208
+lfsw07-g002 ansible_host=192.168.0.209
+lfsw08-g001 ansible_host=192.168.0.220
+lfsw08-g002 ansible_host=192.168.0.221
+
+[evpn_spine]
+spsw-g001 ansible_host=192.168.0.128
+spsw-g002 ansible_host=192.168.0.129
+spsw-g003 ansible_host=192.168.0.130
+spsw-g004 ansible_host=192.168.0.131
+
+[gns_fw]
+gns-ifw01-g000 ansible_host=192.168.0.166
+
+[gns_fmgr]
+gns-fmgr01-g001 ansible_host=20.194.18.236
+
+[gns_lb]
+gns-ilb01-g001 ansible_host=20.19.16.162 
+gns-ilb01-g002 ansible_host=20.19.16.163 
+
+[gns:children]
+gns_fw
+gns_lb
+gns_fmgr
+
+[all:children]
+dcnm
+fabric 
+evpn_leaf
+evpn_spine
+gns_fw
+gns_lb
+gns_fmgr
+
+[fabric:children]
+############ Inventory Variables #################
+[all:vars]
+topology=./topology.yml
+
+#[dcnm:vars]
+#ansible_connection=httpapi
+#ansible_network_os=cisco.dcnm.dcnm
+#ansible_httpapi_validate_certs=False
+#ansible_httpapi_use_ssl=True
+
+[fabric:vars]
+ansible_connection=local
+ansible_network_os=nxos
+
+[gns_fw:vars]
+ansible_network_os=fortinet.fortios.fortios
+ansible_httpapi_validate_certs=no
+ansible_httpapi_use_ssl=False
+ansible_connection=httpapi
+
+[gns_fmgr:vars]
+ansible_network_os=fortinet.fortimanager.fortimanager
+ansible_httpapi_use_ssl=True
+ansible_httpapi_validate_certs=no 
+ansible_connection=httpapi
+
+[gns_lb:vars]
+ansible_httpapi_validate_certs=no
+ansible_httpapi_use_ssl=False
+ansible_connection=httpapi

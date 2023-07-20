@@ -1,0 +1,5 @@
+*.retry
+.*.sw[op]
+*.py[co]
+# Don't commit shared roles since they are already source-controlled in other projects
+roles/ans-role-*

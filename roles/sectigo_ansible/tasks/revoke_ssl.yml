@@ -1,0 +1,21 @@
+---
+# Revoke SSL certificate
+- name: "Revoke the sectigo SSL certificate"
+  sectigo_ansible:
+    ca_base_url: "{{ sectigo_cm_base_url }}"
+    login: "{{ sectigo_cm_user }}"
+    password: "{{ sectigo_cm_password }}"
+    customer_uri: "{{ sectigo_cm_uri }}"
+    org_id: "{{ sectigo_cm_org_id }}"
+    force: "{{ sectigo_force }}"
+    state: "{{ sectigo_state }}"
+    ssl_id: "{{ sectigo_ssl_cert_ssl_id }}"
+    reason: "{{ sectigo_reason }}"
+  register: revoke_result # <4>
+  when: sectigo_state == 'absent'
+
+- name: Show details of the revoked certificate
+  debug:
+    var: revoke_result
+    verbosity: 2
+

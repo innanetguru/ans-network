@@ -1,0 +1,38 @@
+# This playbook works only on Ubuntu
+
+
+- name: Setup required dependencies for apt
+  hosts: localhost
+  become: yes
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Install python-apt and python3-apt
+      raw: "apt-get install -y python-apt python3-apt python3-dev"
+
+- name: Setup required dependencies for managing FreeBSD and Ubuntu
+  hosts: localhost
+  become: yes
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Install sshpass
+      package:
+        name: sshpass
+        state: present
+
+    - name: Install paramiko (for FreeBSD)
+      pip:
+        name: paramiko
+
+- name: Setup required dependencies for test suites for roles and ansible module
+  hosts: localhost
+  become: yes
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Install test dependencies
+      pip:
+        name: 
+          - molecule
+          - pytest

@@ -1,0 +1,33 @@
+---
+- name: Extract Build Parameters
+  hosts: localhost
+  connection: smart
+  gather_facts: no 
+  tasks:
+    - name: Extract Data from Source
+      read_csv:
+        delimeter: ','
+        dialect:
+- name:  Create Network Resources -- infoblox.otxlab.net
+  hosts: "infoblox.otxlab.net"
+  collections:
+    - infoblox.nios_modules
+  connection: local
+  gather_facts: no 
+  vars_files:
+  tasks:
+    - name: Create Network Allocation
+      nios_network:
+        network:  "{{ item.SUBNET }}"
+        state: present
+        comment:  "{{ RFA }}-{{ username }}-{{ date }}"
+        extattrs:
+          Purpose:
+          Region:
+          Site:
+          VLAN:
+        provider:
+          username:
+          password:
+          host: "{{ inventory_hostname }}"
+      loop: "{{ dict }}

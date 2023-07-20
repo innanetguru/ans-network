@@ -1,0 +1,47 @@
+---
+- name: Deploy VIP
+  hosts: "gns_lb"
+  connection: local
+  gather_facts: no 
+
+  #vars_prompt:
+  #- name: username
+   # prompt: Username
+   # private: no 
+  #- name: password 
+   # prompt: Password
+
+  tasks:
+    - name:  Load device facts
+      bigip_device_info:
+        provider: "{{ provider }}"
+        #validate_certs: no 
+        gather_subset:
+          - devices
+          #- device-groups
+          #- sync-status
+          #- system-info
+          #- provision-info
+          #- traffic-groups
+          #- cfe
+          #- do
+
+      delegate_to: localhost
+      register: facts
+
+    - name: create facts file
+      copy: 
+        content: "{{ facts | to_nice_json }}"
+        dest: "{{ inventory_hostname }}_facts.json"
+        owner: innanetguru
+        mode: 0777
+
+    - name: Print facts
+      debug:
+        msg: 
+          - "{{ facts.ansible_facts.ansible_net_devices[hostname] }}"
+          #- "{{ inventory_hostname }} is a {{ ansible_net_model }} running software version {{ ansible_net_version }}"
+          #- "{{ inventory_hostname }} has {{ ansible_net_image  }}"
+          #- "{{ ansible_net_config.splitlines() }}"
+          #- "{{ vlan_list }}"
+          #- "{{ ansible_user }}"

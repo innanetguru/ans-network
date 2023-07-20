@@ -1,0 +1,36 @@
+---
+bp2_vpnrtr_l001:
+  remote_peers:
+    - public_ip: '1.1.1.1'
+      private_ip: '169.254.29.9'
+      psk: 'z?pb'wp&!2LffI=i#HLDtB!=B!d^uVN5'
+      asn: '42110001114'
+    - public_ip: '2.1.1.1'
+      private_ip: '169.254.231.221'
+      psk: 'Xm?V$`Q'BDphb,QA+rLvStCqcso9+$Z!'
+      asn: '42110001114'
+  local_peer:
+    - private_ip: '169.254.29.10'
+      private_ipmask: "255.255.255.252"
+    - private_ip: '169.254.231.222'
+      private_ipmask: "255.255.255.252"
+  vpn_conn_id: 'vpn-bfead3434bc343fd0'
+  vpn_custgw_id: 'cgw-abcdef987654321'
+bp2_vpnrtr_l002:
+  remote_peers:
+    - public_ip: '1.1.2.1'
+      private_ip: '169.254.117.13'
+      psk: '*fxA97'R\Jt'@\nxdP,1jt*LncV@,gF:'
+      asn: '42110001114'
+    - public_ip: '2.1.2.1'
+      private_ip: '169.254.21.129'
+      psk: 'F#~asY+3~9oUw^vUPCX;"VrqB52ccjCg'
+      asn: '42110001114'
+  local_peer:
+    - private_ip: '169.254.117.14'
+      private_ipmask: "255.255.255.252"
+    - private_ip: '169.254.21.130'
+      private_ipmask: "255.255.255.252"
+  vpn_conn_id: 'vpn-f9e8d7c6b5a4f3e2d1c0'
+  vpn_custgw_id: 'cgw-a0b1c2d3e4f5a6b7'
+jira: 'jira-1234'

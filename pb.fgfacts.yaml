@@ -1,0 +1,53 @@
+---
+- name: Fortinet Facts
+  hosts: "fmg1"
+  collections:
+   - fortinet.fortimanager
+   - fortinet.fortios
+  connection: httpapi
+  gather_facts: False 
+  #pre-tasks:
+    #- include_vars: "{{ topology }}"
+
+  vars_files:
+    - keys.yaml
+    - roles/fortimgr/vars/main.yaml
+    - roles/fortimgr/defaults/main.yaml
+  
+  vars_prompt:
+    - name: comment
+      prompt: Enter IM#/CR#/JIRA
+  
+  
+  tasks:
+    - name:  fetch PKG ADOM
+      fmgr_fact:
+        facts:
+          selector: 
+            pm_pkg_adom
+          params:
+            adom:  "{{ adom }}"
+
+    - name:  fetch GLOBALS
+      fmgr_fact:
+        facts:
+          selector: 
+            pm_pkg_global
+
+    - name:  fetch PKG
+      fmgr_fact:
+        facts:
+          selector: 
+            pm_pkg
+          params:
+            adom:  "{{ adom }}"
+            pkg_path: ""
+
+    - name: retrieve all the IPv4 address groups
+      fmgr_fact:
+        facts:
+          selector: 
+            firewall_address
+          params:
+            adom: "{{ adom }}"
+            address: ''

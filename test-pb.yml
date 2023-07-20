@@ -1,0 +1,10 @@
+---
+- name: Playbook Template
+  hosts: "localhost"
+  gather_facts: true
+
+
+  tasks:
+    - name: Print "ansible works!"
+      debug:
+        msg: "ansible works!"

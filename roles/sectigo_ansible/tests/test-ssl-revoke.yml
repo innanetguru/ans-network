@@ -1,0 +1,11 @@
+---
+
+- name: Revoke the SSL Certificate
+  hosts: localhost
+  roles:
+    - sectigo_ansible
+  vars:
+    sectigo_cm_base_url: 'https://myca.cert-manager.com/api/ssl/v1'
+    sectigo_ssl_cert_ssl_id: "1234"
+    sectigo_reason: Compromised certificate
+    sectigo_state: absent

@@ -1,0 +1,22 @@
+---
+- name: Test DCNM 
+  hosts: "dcnm-g000"
+  connection: httpapi
+  gather_facts: no 
+  collections:
+    - cisco.dcnm
+#https://github.com/CiscoDevNet/ansible-dcnm/issues/157
+
+  tasks:
+    - name: check inventory
+      dcnm_inventory:
+        fabric: BP2_LAB
+        state: query
+        #config:
+         # - seed_ip: 
+          #  auth_protocol: MD5
+           # username: dcnm-admin
+           # password: dcnm-admin-password
+           # max_hops: 30
+           # preserve_config: True
+           # role: leaf

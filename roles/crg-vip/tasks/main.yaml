@@ -1,0 +1,113 @@
+---
+- name: Create PROD Nodes
+  bigip_node:
+    provider: "{{ provider }}"                        # Provider DICT in group_vars/all.yaml; arguments collected at runtime
+    name: "{{ item.fqdn }}"                                # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+    fqdn: "{{ item.fqdn }}"                                # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+    #validate_certs: no
+  loop: "{{ build_params.server_params.prod }}"   # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+
+- name: Create TEST Nodes
+  bigip_node:
+    provider: "{{ provider }}"                        # Provider DICT in group_vars/all.yaml; arguments collected at runtime
+    name: "{{ item.fqdn }}"                                # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+    fqdn: "{{ item.fqdn }}"                                # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+    #validate_certs: no
+  loop: "{{ build_params.server_params.test }}"
+
+- name: Create PROD application/service Pool    
+  bigip_pool:
+    provider: "{{ provider }}"
+    state: present
+    name: "{{ build_params.bigip_params.pools.prod }}"    # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+    lb_method: "{{ lb_method }}"       # role default: round-robin, roles/https-application/defaults/main.yaml; override via extra-vars or role_vars
+    monitors: 
+          - http
+          - tcp          # role default: ['tcp', 'http']; override via extra-vars or role_vars
+    monitor_type:  and_list
+    partition: Common
+
+- name: Create TEST application/service Pool    
+  bigip_pool:
+    provider: "{{ provider }}"
+    state: present
+    name: "{{ build_params.bigip_params.pools.test }}"    # passed in as '-e', e.g. 'ansible-playbook pb.crg.yaml -e @pb.crg.extra-vars.yaml'
+    lb_method: "{{ lb_method }}"       # role default: round-robin, roles/https-application/defaults/main.yaml; override via extra-vars or role_vars
+    monitors: 
+          - http
+          - tcp          # role default: ['tcp', 'http']; override via extra-vars or role_vars
+    monitor_type:  and_list
+    partition: Common
+
+
+- name: Add PROD Application Servers to PROD Application/service Pool
+  bigip_pool_member:
+    provider: "{{ provider }}"
+    pool: "{{ build_params.bigip_params.pools.prod }}"
+    fqdn: "{{ item.fqdn }}"
+    port: "{{ item.port }}"
+  loop: "{{ build_params.server_params.prod }}"
+
+- name: Add TEST Application Servers to TEST Application/service Pool
+  bigip_pool_member:
+    provider: "{{ provider }}"
+    pool: "{{ build_params.bigip_params.pools.test }}"
+    fqdn: "{{ item.fqdn }}"
+    port: "{{ item.port }}"
+  loop: "{{ build_params.server_params.test }}"
+
+- name: Create PROD SSL Profile 
+  bigip_profile_client_ssl:
+    provider: "{{ provider }}"
+    state: present
+    #delegate_to: localhost
+    name: "{{ build_params.custTag }}_ssl-profile-prod"   #  r1.0 passed in from -e @vars.yml
+    cert_key_chain:
+      - cert: default.crt     #  r1.0 passed in from -e @vars.yml
+        key: default.key       #  r1.0 passed in from -e @vars.yml
+        chain: "{{ ca_chain }}"      #  role vars
+
+- name: Create test SSL Profile 
+  bigip_profile_client_ssl:
+    provider: "{{ provider }}"
+    state: present
+    #delegate_to: localhost
+    name: "{{ build_params.custTag }}_ssl-profile-test"   #  r1.0 passed in from -e @vars.yml
+    cert_key_chain:
+      - cert: default.crt     #  r1.0 passed in from -e @vars.yml
+        key: default.key       #  r1.0 passed in from -e @vars.yml
+        chain: "{{ ca_chain }}"      #  role vars
+
+- name: Create TEST Virtual Server
+  bigip_virtual_server:
+    provider: "{{ provider }}"
+    name: "{{ build_params.application_names.test }}_https"  #  r1.0 passed in from -e @vars.yml
+    type: standard
+    source: 0.0.0.0/0
+    destination: "{{ build_params.shared_params.custGrpVips[1]['name'] }}"  # r1.0 passed in from -e @vars.yml
+    port: "{{ svc_port }}"          # https-application role-default
+    pool: "{{ build_params.bigip_params.pools.test }}"
+    snat: automap
+    profiles:
+      - tcp
+      - name: "{{ build_params.custTag }}_ssl-profile-test"  #  r1.0 passed in from -e @vars.yml
+        context: client-side
+    enabled_vlans: /Common/backend_transit
+  delegate_to: localhost
+
+- name: Create PROD Virtual Server
+  bigip_virtual_server:
+    provider: "{{ provider }}"
+    name: "{{ build_params.application_names.prod }}_https"  #  r1.0 passed in from -e @vars.yml
+    type: standard
+    source: 0.0.0.0/0
+    destination: "{{ build_params.shared_params.custGrpVips[0]['name'] }}"  # r1.0 passed in from -e @vars.yml
+    port: "{{ svc_port }}"          # https-application role-default
+    pool: "{{ build_params.bigip_params.pools.prod }}"
+    snat: automap
+    profiles:
+      - tcp
+      - name: "{{ build_params.custTag }}_ssl-profile-prod"  #  r1.0 passed in from -e @vars.yml
+        context: client-side
+    enabled_vlans: /Common/backend_transit
+  delegate_to: localhost

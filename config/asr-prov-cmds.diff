@@ -1,0 +1,6 @@
+configure terminal
+hostname border01
+interface GigabitEthernet4
+ description home-network-mgmt
+ no ip dhcp client client-id ascii cisco-0c90.718c.0003-Gi4
+ ip address 192.168.0.170 255.255.255.0

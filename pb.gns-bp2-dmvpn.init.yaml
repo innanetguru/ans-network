@@ -1,0 +1,10 @@
+- name: deploy BP2 DMVPN config to GNS3 Lab
+  hosts: dmvpn-hub-g001
+  connection: network_cli
+  gather_facts: no
+  vars_files: Null 
+  vars: Null 
+  tasks:
+    - name: Push Initial Configuration to test env
+      ios_config:
+        src: config/gns.dmvpn-hub-g001.cfg

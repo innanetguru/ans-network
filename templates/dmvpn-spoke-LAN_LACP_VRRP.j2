@@ -1,0 +1,173 @@
+hostname {{ inventory_hostname }}
+
+vrf definition DCI
+ rd {{ interfaces.loopback5.ip }}:65110
+ !       
+ address-family ipv4
+ exit-address-family
+!        
+vrf definition FVRF-INET
+ !       
+ address-family ipv4
+ exit-address-family
+
+aaa group server tacacs+ ISE
+ server-private {{ tacacs1_ip }} key 7 133338282E1A520B0C2C1931110537303126595772
+ server-private {{ tacacs2_ip }} key 7 00323C3C214D5D2728297D4C2D3E2120352E540501
+ ip vrf forwarding DCI
+ ip tacacs source-interface Loopback5
+
+enable secret 5 $1$jdy9$NcGw3Aw.leBggySEQcNny1
+
+aaa new-model
+!        
+!        
+aaa authentication password-prompt "ISE servers are not reachable!! Please use the local password:"
+aaa authentication login default group ISE local
+aaa authentication login console local
+aaa authentication enable default group ISE enable
+aaa authorization config-commands
+aaa authorization exec default group ISE local 
+aaa authorization commands 15 default group ISE if-authenticated 
+aaa accounting exec default start-stop group ISE
+aaa accounting commands 15 default start-stop group ISE
+
+username admin privilege 15 password 7 03374E1B551D74494D1B1C1127324F48137A3920
+
+key chain DMVPN-KEY
+ key 1
+  key-string 7 091C7E5A1731440A1F29552D3914
+
+crypto ikev2 proposal DMVPN-IKEv2-PROPOSAL
+ encryption aes-gcm-256
+ prf sha512
+ group 19
+!
+crypto ikev2 policy DMVPN-IKEv2-POLICY
+ match fvrf FVRF-INET
+ proposal DMVPN-IKEv2-PROPOSAL
+!
+crypto ikev2 keyring DMVPN-KEYRING
+ peer DMVPN-PEERS
+  address 0.0.0.0 0.0.0.0
+  pre-shared-key OP3nT3xt5h4red
+ !
+!
+!
+crypto ikev2 profile DMVPN-IKEv2-PROFILE
+ description IKEv2 Profile for DMVPN Cloud
+ match fvrf FVRF-INET
+ match address local interface GigabitEthernet0/0/0
+ match identity remote address 0.0.0.0 
+ identity local address {{ interfaces.tunnel10.ip }}
+ authentication local pre-share
+ authentication remote pre-share
+ keyring local DMVPN-KEYRING
+
+track 10 interface tunnel10 line-protocol
+!
+lldp run
+!
+crypto ipsec security-association replay window-size 1024
+!        
+crypto ipsec transform-set DMVPN-TS esp-aes 256 
+ mode tunnel
+!        
+crypto ipsec profile DMVPN-IPSEC-PROFILE
+ set transform-set DMVPN-TS 
+ set ikev2-profile DMVPN-IKEv2-PROFILE
+
+
+
+interface Loopback5
+ description FOR_ROUTING_PROCESS
+ vrf forwarding DCI
+ ip address {{ interfaces.loopback5.ip }} 255.255.255.255
+!        
+interface Tunnel10
+ description DMVPN-DCI Tunnel Interface
+ bandwidth 200000
+ vrf forwarding DCI
+ ip address {{ interfaces.tunnel10.ip }} 255.255.255.0
+ no ip redirects
+ ip mtu 1400
+ no ip split-horizon eigrp 10
+ ip nhrp authentication OP3nT3xt
+ ip nhrp map multicast {{ dmvpn_hub_public1 }}
+ ip nhrp map {{ dmvpn_hub_private1 }} {{ dmvpn_hub_public1 }}
+ ip nhrp map {{ dmvpn_hub_private2 }} {{ dmvpn_hub_public2 }}
+ ip nhrp map multicast {{ dmvpn_hub_public2 }}
+ ip nhrp network-id 10
+ ip nhrp nhs {{ dmvpn_hub_private1 }}
+ ip nhrp nhs {{ dmvpn_hub_private2 }} priority 2
+ ip tcp adjust-mss 1360
+ load-interval 30
+ tunnel source GigabitEthernet0/0/0
+ tunnel mode gre multipoint
+ tunnel key 10
+ tunnel vrf FVRF-INET
+ tunnel protection ipsec profile DMVPN-IPSEC-PROFILE
+
+
+interface GigabitEthernet0/0/0
+ description *** ISP Interface ***
+ vrf forwarding FVRF-INET
+ ip address {{ interfaces.g0_0_0.ip }} {{ interfaces.g0_0_0.mask }}
+ ip access-group DMVPN_PEERS in
+ lldp transmit
+ lldp receive
+
+interface GigabitEthernet0/0/1
+ description *** LAN Interface ***
+ channel-group 1 mode active
+ lldp transmit
+ lldp receive
+!        
+interface GigabitEthernet0/0/2
+ description *** LAN Interface ***
+ channel-group 1 mode active
+ lldp transmit
+ lldp receive
+
+interface Port-channel1
+  description **LAN_L3_GW**
+  vrf forwarding DCI
+  ip address {{ interfaces.po1.ip }} {{ interfaces.po1.mask }}
+  vrrp 1 ip {{ interfaces.po1.vrrp.ip }}
+  vrrp 1 track 10
+
+
+router eigrp DMVPN
+ !
+ address-family ipv4 unicast vrf DCI autonomous-system 10
+  !
+  af-interface default
+   passive-interface
+  exit-af-interface
+  !
+  af-interface Tunnel10
+   authentication mode md5
+   authentication key-chain DMVPN-KEY
+   no passive-interface
+   no split-horizon
+  exit-af-interface
+  !
+  topology base
+   redistribute connected metric 20000 10000 255 1 1500 route-map conn2eigrp
+  exit-af-topology
+  eigrp router-id {{ interfaces.loopback5.ip }}
+ exit-address-family
+
+ip route vrf FVRF-INET 0.0.0.0 0.0.0.0 {{ routing.static.fvrf_inet.gw }}
+
+route-map conn2eigrp permit 10
+  set tag 10
+
+ip access-list extended DMVPN_PEERS
+ 10 permit ip host {{ dmvpn_hub_public1 }} host {{ interfaces.g0_0_0.ip }}
+ 20 permit ip host {{ dmvpn_hub_public2 }} host {{ interfaces.g0_0_0.ip }}
+
+snmp-server community Sup3r5ecUr$tr1ng!0fROc0mMeez! RO
+snmp-server trap-source Loopback5
+snmp-server source-interface informs Loopback5
+snmp-server host {{ snmp_manager_ip }} vrf DCI version 2c Sup3r5ecUr$tr1ng!0fROc0mMeez! 

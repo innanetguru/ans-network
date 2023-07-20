@@ -1,0 +1,1544 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Copyright: (c) 2019, Sectigo <x.y@sectigo.com>
+# Sectigo License
+
+# -------------------------------- #
+# sectigo_pycert Version: v1.0.1.0 #
+# -------------------------------- #
+
+from __future__ import absolute_import, division, print_function
+
+
+__metaclass__ = type
+
+ANSIBLE_METADATA = {
+    'metadata_version': '1.1',
+    'status': ['preview'],
+    'supported_by': 'sectigo'
+}
+# For documentation follow guidelines here:
+#   https://docs.ansible.com/ansible/latest/dev_guide/developing_modules_documenting.html
+#   https://docs.ansible.com/ansible/latest/dev_guide/testing_documentation.html#testing-module-documentation
+
+DOCUMENTATION = '''
+---
+module: sectigo_ansible
+
+short_description: Issue or revoke a Sectigo CA certificate
+
+description:
+    - Issues or revokes a Sectigo certificate using the Sectigo REST API.
+    - You must be a Sectigo customer to use this module and have available your customer uri and credentials.
+
+version_added: "2.8"
+
+author:
+    - Sectigo (@sectigo)
+
+options:
+    ca_base_url:
+        type: str
+        description: Your sectigo ca base url. For example https://mycompany.cert-manager.com/api/ssl/v1
+        required: true
+    customer_uri:
+        type: str
+        description: Your customer URI provided by Sectigo.
+        required: true
+    login:
+        type: str
+        description:
+            - Your Sectigo account login. 
+            - If not set the environment variable C(SECTIGO_ANSIBLE_LOGIN) will be used.
+    password:
+        type: str
+        description:
+            - Your Sectigo account password. 
+            - If not set the environment variable C(SECTIGO_ANSIBLE_PASSWORD) will be used.
+    org_id:
+        description:
+            - Your Sectigo organization id. 
+            - Must be at a natural number greater than 1.
+    state:
+        type: str
+        description:
+            - If state is "present" and I(path) does not contain a valid certificate enroll for a new certificate.
+            - > 
+                If state is "present" and any of the certificate fields or the CSR have changed compared to the ones 
+                of the certificate at I(path) enroll for a new certificate.
+            - If state is "absent" revoke the certificate.
+        choices:
+            - present
+            - absent
+        default: present
+    csr:
+        type: path
+        description:
+            - Path were to find the Certificate Signing Request (CSR).
+            - Required if I(state=present)
+    cert_type:
+        type: int
+        description:
+            - The certificate type.
+            - Required if I(state=present)
+    format_type:
+        type: str
+        description:
+            - The delivery format of the certificate.
+        choices:
+            - x509
+            - x509CO
+            - x509IO
+            - x509IOR
+            - base64
+            - bin
+    max_timeout:
+        type: int
+        description:
+            - The maximum time in seconds before a certificate download attempt will time out. Default is 600 seconds.
+        default: 600
+    loop_period:
+        type: int
+        description:
+            - The time in seconds between each attempt to download the issued certificate. Default is 30 seconds.
+        default: 30
+    number_servers:
+        type: int
+        description:
+            - Number of server licenses for wildcard certificates.
+        default: 0
+    server_type:
+        type: int
+        description:
+            - Server type Id.
+            - Must be greater or equal than -1.
+        default: -1
+    term:
+        type: int
+        description:
+            - Certificate validity period in days.
+            - Must be greater than 0
+        default: 365
+    comments:
+        type: str
+        description:
+            - Comments for the enrollment request.
+            - Cannot exceed 1024 bytes
+    reason:
+        type: str
+        description:
+            - Short message with a reason why the certificate must be revoked.
+            - Cannot exceed 512 bytes.
+            - Required if I(state=absent)
+    ssl_id:
+        type: str
+        description:
+            - Certificate ID
+            - Required if I(state=absent)
+    custom_fields:
+        type: dict
+        description:
+            - List of custom fields to be applied to the requested certificate.
+            - Each field is a dictionary
+            - Must contain mandatory custom fields.
+    subject_alt_names:
+        description:
+            - Subject alternative names.
+    external_requester:
+        type: list
+        description:
+            - External requester email addresses.
+            - The combined length of all the specified addresses must not exceed 512 bytes.
+    path:
+        type: path
+        description: 
+            - > 
+                Path of the folder were to store the signed certificate, the csr (if generated by the module) and the 
+                private key (if generated by the module).
+    force:
+        type: bool
+        description:
+            - Should we enroll for a new certificate even if a valid certificate already exists at I(path).
+        default: no
+seealso:
+    - module: openssl_csr
+      description: Ansible module to generate a CSR
+notes:
+    - The module will not generate a new certificate if a valid one exists at the requested path.
+    - This behavior can be overridden by setting I(enroll_always=true). Enabling this option costs you extra charges.
+requirements:
+    - pyOpenSSL
+    - sectigo_api_client >= 0.1
+'''
+
+EXAMPLES = '''
+# Enroll and collect a new SSL certificate
+- name: Issue new certificate 
+  sectigo_ansible:
+    ca_base_url: https://myca.cert-manager.com/api/ssl/v1
+    login: mylogin
+    password: mypassword
+    customer_uri: "myuri"
+    org_id: 335
+    state: "present"
+    cert_type: 51
+    term: 365
+    subject: "C=CA/ST=ON/L=Ottawa/O=MyOrg/OU=Research/CN=myorg.com/emailAddress=example@myorg.com" 
+    certificate_file_name: "certificate"
+    format_type: "x509CO" 
+    sectigo_max_timeout: 600
+    sectigo_loop_period: 30
+    certificate_path: "./mysslcerts"  
+    domain: "myorg.com"
+    subj_alt_names: ""
+    number_servers: 0
+    server_type: -1
+    comments: ""
+    external_requester: ""
+    custom_fields: "{}"
+  register: enrollment_result 
+
+# Enroll and collect a new SSL certificate using a csr
+- name: Test with a message and changed output
+  sectigo_ansible:
+    ca_base_url: {{ ca_base_url }}
+    login: {{ login }}
+    password: {{ password }}
+    customer_uri: "myuri"
+    org_id: 527
+    state: "present"
+    cert_type: 51
+    term: 365
+    csr: "./mycert.csr" 
+    certificate_file_name: "certificate"
+    format_type: "x509CO" 
+    sectigo_max_timeout: 600
+    sectigo_loop_period: 30
+    certificate_path: "./mysslcerts" 
+    domain: "myorg.com"
+    subj_alt_names: ""
+    number_servers: 0
+    server_type: -1
+    comments: "test"
+    external_requester: "admin@myorg.com"
+    custom_fields: {}
+  register: enrollment_result 
+
+# Revoke an SSL certificate
+  # The task below will block until the certificate has been revoked
+  # The revocation result is stored in the revocation_result variable.
+- name: "Revoke a Sectigo SSL certificate"
+  sectigo_ansible:
+    ssl_id: 527 
+    reason: "Compromised key"
+    state: absent
+register: revocation_result
+'''
+
+RETURN = '''
+original_message:
+    description: The original name param that was passed in
+    type: str
+    returned: always
+message:
+    description: The output message that the sample module generates
+    type: str
+    returned: always
+'''
+
+# Import json module to handle json values
+try:
+    import json
+except ImportError:
+    import simplejson as json
+
+# Import AnsibleModule and other libraries we use for the module purposes
+from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.basic import missing_required_lib
+
+import os
+import traceback
+
+LIB_IMP_ERROR = None
+try:
+    from json import JSONEncoder
+    HAS_JSON = True
+except ImportError:
+    HAS_JSON = False
+    JSON_IMP_ERROR = traceback.format_exc()
+
+SECTIGOAPI_IMP_ERROR = None
+try:
+    from ansible.module_utils import sectigo_api_client as api
+    HAS_SECTIGOAPI = True
+except ImportError:
+    HAS_SECTIGOAPI = False
+    SECTIGOAPI_IMP_ERROR = traceback.format_exc()
+
+
+def underscore_to_camel_case(word):
+    """
+    Convert from naming conventions using '_' to camelCase (leaving first word lowercase)
+    :param word: the word with underscores to convert to camelCase
+    :return: the converted word in camelCase
+    """
+    return ''.join(x.capitalize() or '_' for x in word.split('_'))
+
+
+class SSLCertificateRequest:
+    """
+    Represents an SSL Certificate request
+    """
+
+    def __init__(self, module):
+        """
+        Create a new SSLEnrollment object
+        :param module: the instance of AnsibleModule that contains the module parameters provided by the user
+        """
+        self.sectCABaseUrl = module.params['ca_base_url']
+        self.login = module.params['login']
+        self.password = module.params['password']
+        self.customerUri = module.params['customer_uri']
+        self.orgId = module.params['org_id']
+        if 'csr' in module.params.keys() and module.params['csr']:
+            self.csr = module.params['csr']
+        self.subjAltNames = module.params['subj_alt_names']
+        self.certType = module.params['cert_type']
+        self.numberServers = module.params['number_servers']
+        self.serverType = module.params['server_type']
+        self.term = module.params['term']
+        self.comments = module.params['comments']
+        self.externalRequester = module.params['external_requester']
+        self.customFields = module.params['custom_fields']
+        self.formatType = module.params['format_type']
+        self.maxTimeout = module.params['max_timeout']
+        self.loopPeriod = module.params['loop_period']
+        self.force = module.params['force']
+        self.domain = module.params['domain']
+        self.subject = module.params['subject']
+        self.path = module.params['certificate_path']
+        self.fileName = module.params['certificate_file_name']
+        self.name = self.fileName
+        self.expiryWindow = module.params['expiry_window']
+        self.autoRenew = module.params['auto_renew']
+        self.module = module
+
+    def enroll_and_collect(self):
+        """
+        Enroll and collect the certificate
+        :return: the result of the enrollment and collection
+        """
+        # Assume no changes are made
+        result = dict(changed=False)
+
+        # Build full paths
+        enrollment_filename = self.fileName + '.ids'
+        certificate_filename = self.fileName + '.crt'
+        enrollment_ids_file_path = '/'.join([self.path, enrollment_filename])
+        certificate_file_path = '/'.join([self.path, certificate_filename])
+        enrollment_ids = {}
+
+        # Check if file with sslId and renewId exists
+        already_enrolled = os.path.exists(enrollment_ids_file_path)
+        # Check certificate file and directory exist
+        certificate_exists = os.path.exists(certificate_file_path)
+
+        # If the user requested to forcibly enroll and collect a certificate simply do it
+        if self.force:
+            return self.enroll(enrollment_ids_file_path)
+
+        # Assume the certificate is not valid
+        validity_check_result = -1
+
+        if already_enrolled:
+            enrollment_ids = SSLCertificateResponse.load_from_file(enrollment_ids_file_path)
+
+        # If the certificate exists check if it is valid
+        if certificate_exists:
+            validity_check_result = api.check_cert_validity(self.as_dictionary(), certificate_filename)
+            # If the certificate is not valid then we renew
+            if validity_check_result == -1:
+                # Error validating the certificate
+                raise Exception("Unable to check the cert validity!")
+            elif validity_check_result == 0:
+                # Valid certificate exists
+                self.module.log("Cert validity response is 0")
+            else:
+                # The certificate exists but it has expired. If sectigo_auto_renew is enabled, renew the certificate.
+                if self.autoRenew:
+                    return self.renew(enrollment_ids_file_path)
+                else:
+                    self.module.log("Certificate is not valid, but sectigo_auto_renew is set to False")
+
+        # If a certificate exists, the certificate is valid, and we don't want to force issuance then return.
+        if certificate_exists and validity_check_result == 0 and not self.force:
+            # If we have the enrollment ids we return them in the result
+            if already_enrolled:
+                if hasattr(enrollment_ids, "renew_id"):
+                    result = dict(
+                        changed=False,
+                        msg="Valid certificate already exists",
+                        enrollment_result={
+                            'name': enrollment_filename,
+                            'sslId': enrollment_ids.ssl_id,
+                            'renewId': enrollment_ids.renew_id
+                        }
+                    )
+                    return result
+                else:
+                    result = dict(
+                        changed=False,
+                        msg="Valid certificate already exists",
+                        enrollment_result={
+                            'name': enrollment_filename,
+                            'sslId': enrollment_ids.ssl_id
+                        }
+                    )
+                    return result
+            # but it we don't then still return no failure, but warn the user that collect data are missing
+            else:
+                result = dict(
+                    changed=False,
+                    msg="Certificate already exists, but no enrollment data is available."
+                        "WARNING: This will prevent you from fetching certificates in different format from the server.",
+                    enrollment_result={'name': enrollment_filename, 'sslId': -1, 'renewId': -1}
+                )
+                return result
+
+        # If we already enrolled, then we fetch the data
+        if already_enrolled:
+            # If we already enrolled and we don't want to force enrolling for a new
+            # certificate then we just have to collect the certificate based on the sslId
+            if not self.force:
+                return self.collect(enrollment_ids)
+        # In all the other cases we enroll and collect
+        else:
+            return self.enroll(enrollment_ids_file_path)
+        return result
+
+    def enroll(self, enrollment_ids_file_path):
+        """
+        Enroll for an SSL certificate
+        :param enrollment_ids_file_path: the full path where the enrollment ids file is stored
+        :return: a result dictionary containing the result of the entire enrollment and collect operation or an error
+        """
+        temporary_file_path = enrollment_ids_file_path + ".tmp"
+        enrollment_response = SSLCertificateResponse.json_loads(
+            api.sect_enroll_ssl_cert(self.as_dictionary()), self.name
+        )
+        enrollment_response.set_name(self.fileName)
+        # If the result contains a code then something went wrong
+        if enrollment_response.is_error():
+            result = dict(
+                changed=False,
+                msg=enrollment_response.description,
+                error=enrollment_response.as_dictionary()
+            )
+            self.module.fail_json(**result)
+        else:
+            # Store the response
+            json_data = SSLCertificateResponseJSONEncoder().encode(enrollment_response)
+            self.module.log(json_data)
+            # Write only if the document is not null
+            if json_data:
+                with open(temporary_file_path, "w") as ids_file:
+                    ids_file.write(json_data)
+                    ids_file.close()
+                    self.module.atomic_move(temporary_file_path, enrollment_ids_file_path)
+
+            # Load the enrollment ids from the same file
+            self.module.log(enrollment_ids_file_path)
+            enrollment_ids = SSLCertificateResponse.load_from_file(enrollment_ids_file_path)
+
+            # Collect the newly enrolled certificate
+            return self.collect(enrollment_ids)
+
+    def collect(self, enrollment_ids):
+        """
+        Collect an SSL certificate
+        :param enrollment_ids: the full path where the enrollment ids file is stored
+        :return: a result dictionary containing the result of the collect operation or an error
+        """
+        collect_request = CollectSSLCertificateRequest(
+            sect_ca_base_url=self.sectCABaseUrl,
+            login=self.login,
+            password=self.password,
+            customer_uri=self.customerUri,
+            format_type=self.formatType,
+            max_timeout=self.maxTimeout,
+            loop_period=self.loopPeriod,
+            cert_file_path=self.path,
+            cert_file_name=self.fileName,
+            **enrollment_ids.as_dictionary()
+        )
+        collect_response = CollectSSLCertificateResponse.json_loads(
+            api.sect_collect_ssl_cert(collect_request.as_dictionary())
+        )
+        # If the result contains a code then something went wrong
+        if collect_response.is_error():
+            self.module.log(collect_response.as_dictionary())
+            result = dict(
+                changed=False,
+                msg=collect_response.description,
+                error=collect_response.as_dictionary()
+            )
+            self.module.fail_json(**result)
+        # Otherwise we return the Ids we got during enrollment
+        else:
+            result = dict(
+                changed=True,
+                msg="Certificate collected",
+                enrollment_result=enrollment_ids.as_dictionary()
+            )
+        return result
+
+    def renew(self, enrollment_ids_file_path):
+        """
+        Renew an SSL certificate
+        :param enrollment_ids_file_path: the full path where the enrollment ids file is stored (i.e. the file that contains the sslID / orderNumber)
+        :return: a result dictionary containing the result of the entire renewal and collect operation or an error
+        """
+        temporary_file_path = enrollment_ids_file_path + ".tmp"
+        renewal_response = SSLCertificateResponse.json_loads(
+            api.sect_renew_ssl_cert(self.as_dictionary()), self.name
+        )
+        renewal_response.set_name(self.fileName)
+        # If the result contains a code then something went wrong
+        if renewal_response.is_error():
+            result = dict(
+                changed=False,
+                msg=renewal_response.description,
+                error=renewal_response.as_dictionary()
+            )
+            self.module.fail_json(**result)
+        else:
+            # Store the response
+            json_data = SSLCertificateResponseJSONEncoder().encode(renewal_response)
+            self.module.log(json_data)
+            # Write only if the document is not null
+            if json_data:
+                with open(temporary_file_path, "w") as ids_file:
+                    ids_file.write(json_data)
+                    ids_file.close()
+                    self.module.atomic_move(temporary_file_path, enrollment_ids_file_path)
+
+            # Load the enrollment ids from the same file
+            self.module.log(enrollment_ids_file_path)
+            enrollment_ids = SSLCertificateResponse.load_from_file(enrollment_ids_file_path)
+
+            # Collect the newly enrolled certificate
+            return self.collect(enrollment_ids)
+
+    def as_dictionary(self):
+        """
+        Provide a representation of this object as a dictionary
+        :return: a dictionary representing an SSLCertificateRequest
+        """
+        request_fields = dict(
+            sectCABaseUrl=self.sectCABaseUrl,
+            login=self.login,
+            password=self.password,
+            customerUri=self.customerUri,
+            orgId=self.orgId,
+            subjAltNames=self.subjAltNames,
+            certType=self.certType,
+            numberServers=self.numberServers,
+            serverType=self.serverType,
+            term=self.term,
+            comments=self.comments,
+            externalRequester=self.externalRequester,
+            customFields=self.customFields,
+            certFilePath=self.path,
+            certFileName=self.fileName,
+            certDomain=self.domain,
+            certSubject=self.subject,
+            expiryWindow=self.expiryWindow,
+            autoRenew=self.autoRenew,
+            force=self.force,
+            name=self.fileName,
+            formatType=self.formatType,
+            maxTimeout=self.maxTimeout,
+            loopPeriod=self.loopPeriod,
+        )
+        if 'csr' in self.__dict__.keys():
+            request_fields['csr'] = self.csr
+        return request_fields
+
+
+class SSLCertificateRequestJSONEncoder(JSONEncoder):
+    """
+    JSONEncoder implementation for SSLCertificateRequest objects
+    """
+
+    def default(self, o):
+        """
+        JSON Encoding of an SSLCertificateRequest
+        :param o: an SSLCertificateRequest object
+        :return: a serializable representation of o
+        """
+        if isinstance(o, SSLCertificateRequest):
+            return o.as_dictionary()
+        else:
+            return json.JSONEncoder.default(self, o)
+
+
+class SSLCertificateResponse:
+    """
+    Represents a response to an SSL Certificate request
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Create a new SSLCertificateResponse object
+        SSLCertificateResponse objects represent answers to an SSL enrollment request sent to the Sectigo REST API.
+        If the enrollment succeeded this constructor expects to receive the following parameters for the object
+        initialization:
+        :param sslId: The SSL Certificate identifier received during the ssl certificate enrollment
+        :param renewId: The SSL Certificate renewal identifier received during the ssl certificate enrollment
+        :param name: The logical name assigned to this certificate. This is usually the filename of the certificate
+                     itself.
+        If the enrollment failed, then the Sectigo REST API must have provided an error code and a description.
+        The constructors expects in such case to receive these parameters:
+        :param code: The error code returned by the Sectigo REST API
+        :param description: The error description
+        Refer to the Sectigo REST API documentation for the details of the error code and description.
+        """
+        # If we have the sslId key, we assume we also have renewId
+        if 'sslId' in kwargs and 'renewId' in kwargs:
+            self.ssl_id = kwargs['sslId']
+            self.renew_id = kwargs['renewId']
+            self.name = kwargs['name']
+            self.error = False
+        elif 'sslId' in kwargs:
+            self.ssl_id = kwargs['sslId']
+            self.name = kwargs['name']
+            self.error = False
+        elif 'code' in kwargs:
+            self.code = kwargs['code']
+            self.description = kwargs['description']
+            self.error = True
+
+    @staticmethod
+    def load_from_file(file_path):
+        """
+        Load a json representation of an SSL Certificate Response from a file. This is useful to retrieve a successful
+        enrollment response if we were unable to collect a certificate because of a timeout or because the user decided
+        to interrupt the request.
+        :param file_path: the full path of the file containing a json representation of the enrollment request
+        :return: a new instance of a SSLCertificateResponse initialized from the provided json file
+        """
+        with open(file_path) as file:
+            json_data = file.read()
+            file.close()
+            return SSLCertificateResponse.json_loads(json_data)
+
+    def set_name(self, certificate_name):
+        """
+        Set the name of the certificate this response refers to
+        :param certificate_name: the name of the certificate this response refers to
+        """
+        self.name = certificate_name
+
+    def is_error(self):
+        """
+        Is this response containing an error?
+        :return: True if this response is an error. False otherwise.
+        """
+        return self.error
+
+    def as_dictionary(self):
+        """
+        Build a dictionary representation of this SSLCertificateResponse object. If this is an error response then
+        return just the error and description fields. Otherwise return a dictionary with the sslId and renewId keys
+        and values.
+        :return: a dictionary representing this SSLCertificateResponse object
+        """
+        if self.is_error():
+            return dict(error=self.code, description=self.description)
+        else:
+            # Don't include renew_id if it's not provided
+            if hasattr(self, "renew_id"):
+                return dict(name=self.name, sslId=self.ssl_id, renewId=self.renew_id)
+            else:
+                return dict(name=self.name, sslId=self.ssl_id)
+
+    @staticmethod
+    def json_loads(enrollment_response_json, certificate_file_name=''):
+        """
+        Create an instance of a SSLCertificateResponse object from the provided JSON representation
+        :param certificate_file_name: The name assigned to this certificate. Typically the filename of the certificate
+        itself. Defaults to an empty string.
+        :param enrollment_response_json: the json representation of an SSL certificate enrollment response
+        :return: an instance of an SSLCertificateResponse object initialized with the data contained in the JSON
+        document.
+        """
+        enrollment_response = json.loads(enrollment_response_json)
+        if certificate_file_name:
+            enrollment_response["name"] = certificate_file_name
+        return SSLCertificateResponse(**enrollment_response)
+
+
+class SSLCertificateResponseJSONEncoder(JSONEncoder):
+    """
+    Encodes an SSLCertificateResponse object in JSON
+    """
+
+    def default(self, o):
+        """
+        JSON Encoding of an SSLCertificateResponse
+        :param o: an SSLCertificateResponse object
+        :return: a serializable representation of o
+        """
+        if isinstance(o, SSLCertificateResponse):
+            return o.as_dictionary()
+        else:
+            return json.JSONEncoder.default(self, o)
+
+
+class CollectSSLCertificateRequest:
+    """
+    Represents a request to collect an SSL Certificate
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Creates a new instance of a CollectSSLCertificateRequest
+        CollectSSLCertificateRequest objects represent a request to collect an SSL certificate from the Sectigo
+        REST API.
+        :param sect_ca_base_url: The Sectigo REST API base url for SSL certificates (e.g.:
+                                 https://myca.cert-manager.com/api/ssl/v1)
+        :param login: The login for the REST API endpoint
+        :param password: The password for the REST API endpoint
+        :param customer_uri: The customer URI
+        :param format_type: the preferred format for receiving the sectigo certificate (e.g.: X509CO)
+        :param max_timeout: The maximum time in seconds before a certificate download attempt will time out
+        :param loop_period: The time in seconds between each attempt to download the issued certificate
+        :param ssl_id: The SSL Certificate renewal identifier received during the ssl certificate enrollment
+        :param cert_file_path: The path of the folder that will contain the certificate
+        :param cert_file_name: The name of the file that will contain the certificate
+        itself.
+        """
+        self.sectCABaseUrl = kwargs['sect_ca_base_url']
+        self.login = kwargs['login']
+        self.password = kwargs['password']
+        self.customerUri = kwargs['customer_uri']
+        self.formatType = kwargs['format_type']
+        self.maxTimeout = kwargs['max_timeout']
+        self.loopPeriod = kwargs['loop_period']
+        self.sslId = kwargs['sslId']
+        self.certFilePath = kwargs['cert_file_path']
+        self.certFileName = kwargs['cert_file_name']
+
+    def as_dictionary(self):
+        """
+        Return a dictionary representing this CollectSSLCertificateRequest object
+        :return: a dictionary representing this CollectSSLCertificateRequest object
+        """
+        return dict(
+            sectCABaseUrl=self.sectCABaseUrl,
+            login=self.login,
+            password=self.password,
+            customerUri=self.customerUri,
+            formatType=self.formatType,
+            maxTimeout=self.maxTimeout,
+            loopPeriod=self.loopPeriod,
+            sslId=self.sslId,
+            certFilePath=self.certFilePath,
+            certFileName=self.certFileName
+        )
+
+
+class CollectSSLCertificateResponse:
+    """
+    Represents a response to a collect SSL certificate request
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Create a new CollectSSLCertificateResponse object
+        CollectSSLCertificateResponse objects represent answers to a collect SSL certificate request sent to the Sectigo
+        REST API.
+        If the collection operation succeeded this constructor expects to receive the following parameters for the
+        object initialization:
+        :param certificate: The SSL Certificate in the format requested during the collection operation
+        If the collection failed, then the Sectigo REST API must have provided an error code and a description.
+        The constructors expects in such case to receive these parameters:
+        :param code: The error code returned by the Sectigo REST API
+        :param description: The error description
+        Refer to the Sectigo REST API documentation for the details of the error code and description.
+        """
+        if 'code' in kwargs:
+            self.code = kwargs['code']
+            self.description = kwargs['description']
+            self.error = True
+        else:
+            self.certificate = kwargs['certificate']
+            self.error = False
+
+    def is_error(self):
+        """
+        Is this response containing an error
+        :return: True if this response is an error. False otherwise.
+        """
+        return self.error
+
+    @staticmethod
+    def json_loads(collection_response_json):
+        """
+        Create an instance of a CollectSSLCertificateResponse object from the provided JSON representation
+        :param collection_response_json: the json representation of a collect SSL certificate response
+        :return: an instance of a CollectSSLCertificateResponse object initialized with the data contained in the
+                 collection_response_json JSON document.
+        """
+        enrollment_response = json.loads(collection_response_json)
+        return CollectSSLCertificateResponse(**enrollment_response)
+
+    def as_dictionary(self):
+        """
+        Return a dictionary representing this CollectSSLCertificateResponse object
+        :return: a dictionary representing this CollectSSLCertificateResponse object
+        """
+        if self.is_error():
+            return dict(error=self.code, description=self.description)
+        else:
+            return dict(certificate=self.certificate)
+
+
+class RevokeSSLCertificateRequest:
+
+    def __init__(self, module):
+        self.module = module
+        self.sectCABaseUrl = module.params['ca_base_url']
+        self.login = module.params['login']
+        self.password = module.params['password']
+        self.customerUri = module.params['customer_uri']
+        self.sslId = module.params['ssl_id']
+        self.reason = module.params['reason']
+
+    def revoke(self):
+        revoke_response = RevokeSSLCertificateResponse.json_loads(api.sect_revoke_ssl_cert(self.__dict__))
+
+        # If the result contains a code then something went wrong
+        if revoke_response.is_error():
+            result = dict(
+                changed=False,
+                msg=revoke_response.description,
+                error=revoke_response.as_dictionary()
+            )
+            self.module.fail_json(**result)
+        # Otherwise we return the Ids we got during enrollment
+        else:
+            result = dict(
+                changed=True,
+                msg="Certificate has been revoked",
+                revoke_result=revoke_response.as_dictionary()
+            )
+        return result
+
+
+class RevokeSSLCertificateResponse:
+
+    def __init__(self, **kwargs):
+        """
+        Create a new RevokeSSLCertificateResponse object
+        RevokeSSLCertificateResponse objects represent answers to a revoke SSL certificate request sent to the Sectigo
+        REST API.
+        If the revocation operation succeeded this constructor expects no parameters for object initialization.
+        It just marks the object as a success response.
+        If the revocation failed, then the Sectigo REST API must have provided an error code and a description.
+        The constructors expects in such case to receive these parameters:
+        :param code: The error code returned by the Sectigo REST API
+        :param description: The error description
+        Refer to the Sectigo REST API documentation for the details of the error code and description.
+        """
+        if 'code' in kwargs:
+            self.code = kwargs['code']
+            self.description = kwargs['description']
+            self.error = True
+        else:
+            self.error = False
+
+    def is_error(self):
+        """
+        Is this response containing an error
+        :return: True if this response is an error. False otherwise.
+        """
+        return self.error
+
+    @staticmethod
+    def json_loads(revoke_ssl_certificate_response_json):
+        """
+        Initialize a RevokeSSLCertificateResponse object from a json file
+        :param revoke_ssl_certificate_response_json: A JSON representation of a RevokeSSLCertificateResponse
+        :return: a new instance of a RevokeSSLCertificateResponse object
+        """
+        revoke_ssl_certificate_response = json.loads(revoke_ssl_certificate_response_json)
+        return RevokeSSLCertificateResponse(**revoke_ssl_certificate_response)
+
+    def as_dictionary(self):
+        """
+        Build a dictionary representation of this object that takes into account the kind of response returned from
+        the Sectigo API. If the response is an error then we return a dictionary that contains only the error fields.
+        Otherwise we return an empty dictionary (because the revoke API method returns an empty object in case of
+        success.
+        :return: a dictionary with the representation of the RevokeSSLCertificateResponse object
+        """
+        if self.is_error():
+            return dict(error=self.code, description=self.description)
+        else:
+            return dict()
+
+
+class ClientCertificateRequest:
+    """
+    Represents a client certificate request
+    """
+
+    def __init__(self, module):
+        """
+        Create a new ClientCertificateRequest object
+        :param module: the instance of AnsibleModule that contains the module parameters provided by the user
+        """
+        self.module = module
+        self.sectCABaseUrl = module.params['ca_base_url']
+        self.login = module.params['login']
+        self.password = module.params['password']
+        self.customerUri = module.params['customer_uri']
+        self.orgId = module.params['org_id']
+        if 'csr' in module.params.keys() and module.params['csr']:
+            self.csr = module.params['csr']
+        self.certType = module.params['cert_type']
+        self.term = module.params['term']
+        self.email = module.params['email']
+        self.firstName = module.params['first_name']
+        self.middleName = module.params['middle_name']
+        self.lastName = module.params['last_name']
+        self.customFields = module.params['custom_fields']
+        self.certFilePath = module.params['certificate_path']
+        self.force = module.params['force']
+        self.certDomain = module.params['domain']
+        self.certFileName = module.params['certificate_file_name']
+        self.name = self.certFileName
+        self.expiryWindow = module.params['expiry_window']
+        self.autoRenew = module.params['auto_renew']
+        self.maxTimeout = module.params['max_timeout']
+        self.loopPeriod = module.params['loop_period']
+        self.certSubject = module.params['subject']
+
+    def enroll_and_collect(self):
+        """
+        Enroll and collect the client certificate
+        :return: the result of the enrollment and collection
+        """
+        # Assume no changes are made
+        result = dict(changed=False)
+
+        # Build full paths
+        enrollment_filename = self.certFileName + '.ids'
+        certificate_filename = self.certFileName + '.crt'
+        enrollment_ids_file_path = '/'.join([self.certFilePath, enrollment_filename])
+        certificate_file_path = '/'.join([self.certFilePath, certificate_filename])
+        enrollment_ids = {}
+
+        # Check if file with sslId and renewId exists
+        already_enrolled = os.path.exists(enrollment_ids_file_path)
+        # Check certificate file and directory exist
+        certificate_exists = os.path.exists(certificate_file_path)
+
+        # If the user requested to forcibly enroll and collect a certificate simply do it
+        if self.force:
+            return self.enroll(enrollment_ids_file_path)
+
+        # Assume the certificate is not valid
+        validity_check_result = -1
+
+        # Check if we already enrolled for the certificate
+        if already_enrolled:
+            enrollment_ids = ClientCertificateResponse.load_from_file(enrollment_ids_file_path)
+
+        # If the certificate exists check if it is valid
+        if certificate_exists:
+            validity_check_result = api.check_cert_validity(self.as_dictionary(), certificate_filename)
+            # If the certificate is not valid then we renew
+            if validity_check_result == -1:
+                # Error validating the certificate
+                raise Exception("Unable to check the cert validity!")
+            elif validity_check_result == 0:
+                # Valid certificate exists
+                self.module.log("Cert validity response is 0")
+            else:
+                # The certificate exists but it has expired. If sectigo_auto_renew is enabled, renew the certificate.
+                if self.autoRenew:
+                    return self.renew(enrollment_ids_file_path)
+                else:
+                    self.module.log("Certificate is not valid, but sectigo_auto_renew is set to False")
+
+         # If a certificate exists, the certificate is valid, and we don't want to force issuance then return.
+        if certificate_exists and validity_check_result == 0 and not self.force:
+            # If we have the enrollment ids we return them in the result
+            if already_enrolled:
+                result = dict(
+                    changed=False,
+                    msg="Valid certificate already exists",
+                    enrollment_result={
+                        'name': enrollment_filename,
+                        'orderNumber': enrollment_ids.order_number
+                    }
+                )
+                return result
+            # but if we don't then still return no failure, but warn the user that collect data are missing
+            else:
+                result = dict(
+                changed=False,
+                msg="Certificate already exists, but no enrollment data is available."
+                    "WARNING: This will prevent you from fetching certificates in different format from the server.",
+                enrollment_result={'name': enrollment_filename, 'orderNumber': -1}
+                )
+                return result
+                
+        # If we already enrolled, then we fetch the data
+        if already_enrolled:
+            # If we already enrolled and we don't want to force enrolling for a new
+            # certificate then we just have to collect the certificate based on the orderNumber
+            if not self.force:
+                return self.collect(enrollment_ids)
+        # In all the other cases we enroll and collect
+        else:
+            return self.enroll(enrollment_ids_file_path)
+        return result
+
+    def enroll(self, enrollment_ids_file_path):
+        """
+        Enroll for a client certificate
+        :param enrollment_ids_file_path: the full path where the enrollment ids file is stored
+        :return: a result dictionary containing the result of the entire enrollment and collect operation or an error
+        """
+        temporary_file_path = enrollment_ids_file_path + ".tmp"
+        enrollment_response = ClientCertificateResponse.json_loads(
+            api.sect_enroll_client_cert(self.as_dictionary()), self.name
+        )
+        # If the result contains a code then something went wrong
+        if enrollment_response.is_error():
+            result = dict(
+                changed=False,
+                msg=enrollment_response.description,
+                error=enrollment_response.as_dictionary()
+            )
+            self.module.fail_json(**result)
+        else:
+            # Store the response
+            json_data = ClientCertificateResponseJSONEncoder().encode(enrollment_response)
+            self.module.log(json_data)
+            # Write only if the document is not null
+            if json_data:
+                with open(temporary_file_path, "w") as ids_file:
+                    ids_file.write(json_data)
+                    ids_file.close()
+                    self.module.atomic_move(temporary_file_path, enrollment_ids_file_path)
+
+            # Load the enrollment ids from the same file
+            self.module.log(enrollment_ids_file_path)
+            enrollment_ids = ClientCertificateResponse.load_from_file(enrollment_ids_file_path)
+
+            # Collect the newly enrolled certificate
+            return self.collect(enrollment_ids)
+
+    def collect(self, enrollment_ids):
+        """
+        Collect a client certificate
+        :param enrollment_ids: the full path where the enrollment ids file is stored
+        :return: a result dictionary containing the result of the collect operation or an error
+        """
+        collect_request = CollectClientCertificateRequest(
+            sect_ca_base_url=self.sectCABaseUrl,
+            login=self.login,
+            password=self.password,
+            customer_uri=self.customerUri,
+            max_timeout=self.maxTimeout,
+            loop_period=self.loopPeriod,
+            cert_file_path=self.certFilePath,
+            cert_file_name=self.certFileName,
+            **enrollment_ids.as_dictionary()
+        )
+        collect_response = CollectClientCertificateResponse.json_loads(
+            api.sect_collect_client_cert(collect_request.as_dictionary())
+        )
+        # If the result contains a code then something went wrong
+        if collect_response.is_error():
+            self.module.log(collect_response.as_dictionary())
+            result = dict(
+                changed=False,
+                msg=collect_response.description,
+                error=collect_response.as_dictionary()
+            )
+            self.module.fail_json(**result)
+        # Otherwise we return the Ids we got during enrollment
+        else:
+            self.module.log(collect_response.certificate)
+            result = dict(
+                changed=True,
+                msg="Enrolled new certificate",
+                enrollment_result=enrollment_ids.as_dictionary()
+            )
+        return result
+
+    def renew(self, enrollment_ids_file_path):
+        """
+        Renew a client certificate
+        :param enrollment_ids_file_path: the full path where the enrollment ids file is stored
+        :return: a result dictionary containing the result of the entire renewal and collect operation or an error
+        """
+        temporary_file_path = enrollment_ids_file_path + ".tmp"
+        renewal_response = ClientCertificateResponse.json_loads(
+            api.sect_renew_client_cert(self.as_dictionary()), self.name
+        )
+        # If the result contains a code then something went wrong
+        if renewal_response.is_error():
+            result = dict(
+                changed=False,
+                msg=renewal_response.description,
+                error=renewal_response.as_dictionary()
+            )
+            self.module.fail_json(**result)
+        else:
+            # Store the response
+            json_data = ClientCertificateResponseJSONEncoder().encode(renewal_response)
+            self.module.log(json_data)
+            # Write only if the document is not null
+            if json_data:
+                with open(temporary_file_path, "w") as ids_file:
+                    ids_file.write(json_data)
+                    ids_file.close()
+                    self.module.atomic_move(temporary_file_path, enrollment_ids_file_path)
+
+            # Load the enrollment ids from the same file
+            self.module.log(enrollment_ids_file_path)
+            enrollment_ids = ClientCertificateResponse.load_from_file(enrollment_ids_file_path)
+
+            # Collect the newly enrolled certificate
+            return self.collect(enrollment_ids)
+
+
+    def as_dictionary(self):
+        request_fields = dict(
+            sectCABaseUrl=self.sectCABaseUrl,
+            login=self.login,
+            password=self.password,
+            customerUri=self.customerUri,
+            orgId=self.orgId,
+            certType=self.certType,
+            term=self.term,
+            email=self.email,
+            firstName=self.firstName,
+            middleName=self.middleName,
+            lastName=self.lastName,
+            customFields=self.customFields,
+            certFilePath=self.certFilePath,
+            certFileName=self.certFileName,
+            certDomain=self.certDomain,
+            certSubject=self.certSubject,
+            expiryWindow=self.expiryWindow,
+            autoRenew=self.autoRenew,
+            maxTimeout=self.maxTimeout,
+            loopPeriod=self.loopPeriod,
+            force=self.force
+        )
+        if 'csr' in self.__dict__.keys():
+            request_fields['csr'] = self.csr
+        return request_fields
+
+
+class ClientCertificateResponse:
+    """
+    Represents a response to a Client Certificate enrollment request
+    """
+
+    def __init__(self, **kwargs):
+        """
+        :param kwargs:
+        """
+        # If we have the sslId key, we assume we also have renewId
+        if 'orderNumber' in kwargs:
+            self.name = kwargs['name']
+            self.order_number = kwargs['orderNumber']
+            self.error = False
+        elif 'code' in kwargs:
+            self.code = kwargs['code']
+            self.description = kwargs['description']
+            self.error = True
+        else:
+            raise Exception("Unexpected response format: " + str(kwargs))
+
+    @staticmethod
+    def load_from_file(file_path):
+        """
+        Load a json representation of a Client Certificate Response from a file. This is useful to retrieve a successful
+        enrollment response if we were unable to collect a certificate because of a timeout or because the user decided
+        to interrupt the request.
+        :param file_path: the full path of the file containing a json representation of the enrollment request
+        :return: a new instance of a ClientCertificateResponse initialized from the provided json file
+        """
+        with open(file_path) as file:
+            json_data = file.read()
+            file.close()
+            return ClientCertificateResponse.json_loads(json_data)
+
+    def is_error(self):
+        """
+        Is this response containing an error?
+        :return: True if this response is an error. False otherwise.
+        """
+        return self.error
+
+    def as_dictionary(self):
+        """
+        Build a dictionary representation of this ClientCertificateResponse object. If this is an error response then
+        return just the error and description fields. Otherwise return a dictionary with the orderNumber key and value.
+        :return: a dictionary representing this ClientCertificateResponse object
+        """
+        if self.is_error():
+            return dict(error=self.code, description=self.description)
+        else:
+            return dict(name=self.name, orderNumber=self.order_number)
+
+    @staticmethod
+    def json_loads(enrollment_response_json, certificate_file_name=''):
+        """
+        Create an instance of a ClientCertificateResponse object from the provided JSON representation
+        :param certificate_file_name:
+        :param enrollment_response_json: the json representation of a Client certificate enrollment response
+        :return: an instance of an ClientCertificateResponse object initialized with the data contained in the JSON
+        document.
+        """
+        enrollment_response = json.loads(enrollment_response_json)
+        if certificate_file_name:
+            enrollment_response['name'] = certificate_file_name
+        return ClientCertificateResponse(**enrollment_response)
+
+
+class CollectClientCertificateRequest:
+    """
+    Represents a request to collect an SSL Certificate
+    """
+
+    def __init__(self, **kwargs):
+        """
+
+        :param kwargs:
+        """
+        self.sectCABaseUrl = kwargs['sect_ca_base_url']
+        self.login = kwargs['login']
+        self.password = kwargs['password']
+        self.customerUri = kwargs['customer_uri']
+        self.orderNumber = kwargs['orderNumber']
+        self.maxTimeout = kwargs['max_timeout']
+        self.loopPeriod = kwargs['loop_period']
+        self.certFilePath = kwargs['cert_file_path']
+        self.certFileName = kwargs['cert_file_name']
+
+    def as_dictionary(self):
+        """
+
+        :return:
+        """
+        return dict(
+            sectCABaseUrl=self.sectCABaseUrl,
+            login=self.login,
+            password=self.password,
+            customerUri=self.customerUri,
+            orderNumber=self.orderNumber,
+            maxTimeout=self.maxTimeout,
+            loopPeriod=self.loopPeriod,
+            certFilePath=self.certFilePath,
+            certFileName=self.certFileName
+        )
+
+
+class CollectClientCertificateResponse:
+
+    def __init__(self, **kwargs):
+        """
+
+        :param kwargs:
+        """
+        if 'code' in kwargs:
+            self.code = kwargs['code']
+            self.description = kwargs['description']
+            self.error = True
+        else:
+            self.certificate = kwargs['certificate']
+            self.error = False
+
+    def is_error(self):
+        """
+        Is this response containing an error
+        :return: True if this response is an error. False otherwise.
+        """
+        return self.error
+
+    @staticmethod
+    def json_loads(collect_response_json):
+        """
+
+        :param collect_response_json:
+        :return:
+        """
+        collect_response = json.loads(collect_response_json)
+        return CollectClientCertificateResponse(**collect_response)
+
+    def as_dictionary(self):
+        """
+
+        :return:
+        """
+        if self.is_error():
+            return dict(error=self.code, description=self.description)
+        else:
+            return dict(certificate=self.certificate)
+
+
+class ClientCertificateResponseJSONEncoder(JSONEncoder):
+    """
+    Encodes a ClientCertificateResponse object in JSON
+    """
+
+    def default(self, o):
+        if isinstance(o, ClientCertificateResponse):
+            return o.as_dictionary()
+        else:
+            return json.JSONEncoder.default(self, o)
+
+
+class RevokeClientCertificateRequest:
+
+    def __init__(self, module):
+        self.module = module
+        self.sectCABaseUrl = module.params['ca_base_url']
+        self.login = module.params['login']
+        self.password = module.params['password']
+        self.customerUri = module.params['customer_uri']
+        self.orderNumber = module.params['order_number']
+        self.reason = module.params['reason']
+
+    def revoke(self):
+        revoke_response = RevokeClientCertificateResponse.json_loads(api.sect_revoke_client_cert(self.__dict__))
+
+        # If the result contains a code then something went wrong
+        if revoke_response.is_error():
+            result = dict(
+                changed=False,
+                msg=revoke_response.description,
+                error=revoke_response.as_dictionary()
+            )
+            self.module.fail_json(**result)
+        # Otherwise we return the Ids we got during enrollment
+        else:
+            result = dict(
+                changed=True,
+                msg="Certificate has been revoked",
+                revoke_result=revoke_response.as_dictionary()
+            )
+        return result
+
+
+class RevokeClientCertificateResponse:
+
+    def __init__(self, **kwargs):
+        if 'code' in kwargs:
+            self.code = kwargs['code']
+            self.description = kwargs['description']
+            self.error = True
+        else:
+            self.error = False
+
+    def is_error(self):
+        """
+        Is this response containing an error
+        :return: True if this response is an error. False otherwise.
+        """
+        return self.error
+
+    @staticmethod
+    def json_loads(revoke_client_certificate_response_json):
+        """
+        Initialize a RevokeSSLCertificateResponse object from a json file
+        :param revoke_client_certificate_response_json: A JSON representation of a RevokeSSLCertificateResponse
+        :return: a new instance of a RevokeSSLCertificateResponse object
+        """
+        revoke_client_certificate_response = json.loads(revoke_client_certificate_response_json)
+        return RevokeClientCertificateResponse(**revoke_client_certificate_response)
+
+    def as_dictionary(self):
+        """
+        Build a dictionary representation of this object that takes into account the kind of response returned from
+        the Sectigo API. If the response is an error then we return a dictionary that contains only the error fields.
+        Otherwise we return an empty dictionary (because the revoke API method returns an empty object in case of
+        success.
+        :return: a dictionary with the representation of the RevokeSSLCertificateResponse object
+        """
+        if self.is_error():
+            return dict(error=self.code, description=self.description)
+        else:
+            return dict()
+
+
+def init_response():
+    """
+    :return:
+    """
+    result = dict(
+        changed=False
+    )
+    return result
+
+
+def run_module():
+    # define available arguments/parameters a user can pass to the module
+    module_args = dict(
+
+        # Common parameters
+        ca_base_url=dict(type='str', required=True),
+        customer_uri=dict(type='str', required=True, no_log=True),
+        org_id=dict(type='int', required=True, no_log=True),
+        # Login and password are mandatory, but we want to check if they are defined in the environment
+        login=dict(type='str', required=False, no_log=True),
+        password=dict(type='str', required=False, no_log=True),
+        max_timeout=dict(type='int', required=False),
+        loop_period=dict(type='int', required=False),
+
+        # Required by both client and SSL certificate enrollment
+        state=dict(default='present', choices=['present', 'absent']),
+        csr=dict(type='path', required=False),
+        cert_type=dict(type='int', required=False),
+        term=dict(type='int', required=False),
+        custom_fields=dict(type='list', default=None, required=False),
+        certificate_path=dict(type='path', required=False),
+        certificate_file_name=dict(type='str', required=False),
+        force=dict(default=False, type='bool', required=False),
+        expiry_window=dict(default=7, type='int'),
+        auto_renew=dict(default=True, type='bool', required=False),
+
+        # SSL Certificate specific parameters
+        format_type=dict(default='x509', type='str', required=False,
+                         choices=['x509', 'x509CO', 'x509IO',
+                                  'x509IOR', 'base64', 'bin']),
+        number_servers=dict(type='int', required=False),
+        server_type=dict(type='int', required=False),
+        comments=dict(type='str', required=False),
+        subj_alt_names=dict(default='', type='str', required=False),
+        external_requester=dict(default=None, type='str', required=False),
+        domain=dict(default='', type='str', required=False),
+        subject=dict(default=None, type='str', required=False),
+
+        # Client Certificate specific parameters
+        email=dict(type='str', required=False),
+        first_name=dict(type='str', required=False),
+        middle_name=dict(default='', type='str', required=False),
+        last_name=dict(type='str', required=False),
+
+        # Revoke SSL Certificate specific parameters
+        ssl_id=dict(type='str', required=False),
+        reason=dict(type='str', required=False),  # this can be also used with email when client certificate revoked
+
+        # Revoke Client Certificate specific parameters
+        order_number=dict(type='str', required=False),
+        serial_number=dict(type='str', required=False),
+
+    )
+
+    # the AnsibleModule object will be our abstraction working with Ansible
+    # this includes instantiation, a couple of common attr would be the
+    # args/params passed to the execution, as well as if the module
+    # supports check mode
+    module = AnsibleModule(
+        argument_spec=module_args,
+        supports_check_mode=False,
+        required_if=[
+            ['state', 'absent', ['reason']],
+            ['state', 'present', ['cert_type', 'term', 'custom_fields', 'certificate_path', 'certificate_file_name']]
+        ],
+        mutually_exclusive=[
+            ['csr', 'subject'],
+            ['ssl_id', 'order_number'],
+            ['email', 'server_type'],
+            ['first_name', 'server_type'],
+        ],
+        required_together=[
+            ['number_servers', 'server_type', 'comments', 'external_requester'],
+            ['certificate_path', 'certificate_file_name'],
+            ['first_name', 'last_name', 'email']
+        ])
+    #        required_if=[
+    #            ['state', 'present', ['cert_type', 'term']],
+    #            ['state', 'absent', ['ssl_id', 'reason']]
+    #        ])
+    #        required_one_of=['private_key_path', 'certificate_path']
+    #    )
+
+    # Handle possible import failures
+    if not HAS_JSON:
+        module.fail_json(msg=missing_required_lib("json"),
+                         exception=JSON_IMP_ERROR)
+
+    if not HAS_SECTIGOAPI:
+        module.fail_json(msg=missing_required_lib("sectigo_api_client"),
+                         exception=SECTIGOAPI_IMP_ERROR)
+
+    # seed the result dict in the object
+    # we primarily care about changed and state
+    # change is if this module effectively modified the target
+    # state will include any data that you want your module to pass back
+    # for consumption, for example, in a subsequent task
+    result = init_response()
+
+    # if the user is working with this module in only check mode we do not
+    # want to make any changes to the environment, just return the current
+    # state with no modifications
+    if module.check_mode:
+        module.exit_json(**result)
+
+    # manipulate or modify the state as needed (this is going to be the
+    # part where your module will do what it needs to do)
+    # result['original_message'] = module.params['comments']
+    # result['message'] = add_timestamps(module.params['comments'])
+    try:
+        if module.params['state'] == 'present':
+            if module.params['email']:
+                client_certificate = ClientCertificateRequest(module)
+                result = client_certificate.enroll_and_collect()
+            else:
+                ssl_certificate = SSLCertificateRequest(module)
+                result = ssl_certificate.enroll_and_collect()
+                module.log(SSLCertificateRequestJSONEncoder().encode(ssl_certificate))
+
+        if module.params['state'] == 'absent':
+            if module.params['ssl_id']:
+                revoke_ssl_certificate = RevokeSSLCertificateRequest(module)
+                result = revoke_ssl_certificate.revoke()
+            elif module.params['order_number']:
+                revoke_client_certificate = RevokeClientCertificateRequest(module)
+                result = revoke_client_certificate.revoke()
+            else:
+                result['msg'] = "Desired state is 'absent' but no ssl id or order number have been provided"
+                module.fail_json(**result)
+    except api.SectigoException as error:
+        result['msg'] = "The Sectigo client library reported an unexpected error"
+        result['error'] = error.error_dictionary()
+        module.fail_json(**result)
+    except Exception as e:
+        result['msg'] = "An unexpected error occurred"
+        result['error'] = e.args
+        module.fail_json(**result)
+
+    # in the event of a successful module execution, you will want to
+    # simple AnsibleModule.exit_json(), passing the key/value results
+    module.exit_json(**result)
+
+
+def main():
+    run_module()
+
+
+if __name__ == '__main__':
+    main()

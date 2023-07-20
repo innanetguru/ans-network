@@ -1,0 +1,10 @@
+---
+# Set facts for revoke operations
+- name : Fail if no SSL Id or orderNumber has been provided but the state is absent
+  fail:
+    msg: You specified a revoke certificate operation but didn't specify sectigo_ssl_cert_ssl_id or sectigo_client_cert_order_number
+  when:
+    - sectigo_ssl_cert_ssl_id is not defined
+    - sectigo_client_cert_order_number is not defined
+    - sectigo_state == 'absent'
+

@@ -1,0 +1,44 @@
+---
+interfaces:
+  g0_0_0:
+    lacp:
+      enabled: False
+      id: Null
+    vrrp:
+      enabled: False
+      id: Null 
+    ip: "5.5.5.2"
+    mask: "255.255.255.248"
+  g0_0_1:
+    lacp:
+      enabled: True
+      id: 1
+    vrrp:
+      enabled: False
+      id: Null 
+    ip:
+    mask:
+  g0_0_2:
+    lacp:
+      enabled: True
+      id: 1
+    vrrp:
+      enabled: False
+      id: Null 
+  loopback5:
+    ip: "10.9.8.76"
+    mask: "255.255.255.255"
+  tunnel10:
+    ip: "10.129.8.23"
+    mask: "255.255.255.0"
+  po1:
+    vrrp:
+      enabled: True
+      id: 1
+      ip: "10.88.100.5"
+    ip: "10.88.100.7"
+    mask: "255.255.252.0"
+routing:
+  static:
+    fvrf_inet:
+      gw: "5.5.5.6"

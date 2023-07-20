@@ -1,0 +1,20 @@
+---
+- hosts: localhost
+  roles:
+    - sectigo_ansible
+  vars:
+    sectigo_cm_base_url: "https://myca.cert-manager.com/api/smime/v1"
+    sectigo_csr_subject: "C=CA/ST=ON/L=Ottawa/O=MyOrg/OU=Research/CN=myorg.com/emailAddress=testuser1@myorg.com"
+    sectigo_client_cert_file_path: "./myclientcerts"
+    sectigo_client_cert_file_name: "test_client"
+    sectigo_client_cert_email: "testuser1@myorg.com"
+    sectigo_client_cert_first_name: test
+    sectigo_client_cert_middle_name:  ""
+    sectigo_client_cert_last_name:  user1
+    sectigo_client_cert_type: 1
+    sectigo_client_cert_validity: 365
+    sectigo_client_cert_custom_fields: "[]"
+    sectigo_client_cert_expiry_window: 7
+    sectigo_auto_renew: true
+    sectigo_max_timeout: 600
+    sectigo_loop_period: 30

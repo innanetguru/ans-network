@@ -1,0 +1,3 @@
+interfaces:
+  outside: "vlan3"
+  inside: "vlan4"

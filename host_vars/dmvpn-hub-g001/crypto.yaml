@@ -1,0 +1,11 @@
+encryption:
+  ikev2:
+    proposals:
+    policies:
+    profiles:
+    keyrings:
+    peers:
+  ipsec:
+    transform_sets:
+    profiles:
+    peers:

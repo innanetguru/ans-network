@@ -1,0 +1,91 @@
+###################################################
+###### Physical Interface and topology data #######
+###################################################
+### the value for "interface-name" should be the ##
+### interface definition for the vendor cli/api. ##
+### the value for "pport: port#" should be the   ##
+### port defined here in the topology file for the#
+### remote-peer; "type"  has several definitions, #
+### each port in the network is defined as one of #
+### these types;  "link" can be an arbitrarily  ###
+### defined sequence of integers e.g. 1,2,3...n ###
+### for uniquely identifying individual links be-##
+### -tween unique nodes/systems; "linkend"       ##
+### defines an A/B relationship                  ##
+# { name: <interface-name>, peer: 1<remote-peer-hostname>, pport: <port#>, type: <ibgp/ebgp/access/trunk/routed/routed-dot1q>, link: <link-id>, linkend: <1-2> }
+
+topo:
+  leaf01:
+    port1:
+    port2:
+    port3:
+    port4:
+    port5:
+    port6:
+    port7:
+    port8:
+    port9:
+    mgmt0: 
+  leaf02:
+    port1:
+    port2:
+    port3:
+    port4:
+    port5:
+    port6:
+    port7:
+    port8:
+    port9:
+    mgmt0:
+  spine01:
+    port1:
+    port2:
+    port3:
+    port4:
+    port5:
+    port6:
+    port7:
+    port8:
+    port9:
+    mgmt0:
+  spine02:
+    port1:
+    port2:
+    port3:
+    port4:
+    port5:
+    port6:
+    port7:
+    port8:
+    port9:
+    mgmt0:
+  coresw01:
+    port1: { name: eth1/1, peer: border01, pport: port2, type: access, link: <link-id>, linkend: 1 }
+    port2: { name: eth1/2, peer: efw01, pport: port2, type: trunk, link: <link-id>, linkend: 1 }
+    port3: { name: eth1/3, peer: appsvr01, pport: NULL, type: access, link: <link-id>, linkend: 1 }
+    port4: { name: eth1/4, peer: elb01, pport: port2, type: trunk, link: <link-id>, linkend: 1 }
+    port5: 
+    port6: { name: eth1/6, peer: elb01, pport: port1, type: trunk, link: <link-id>, linkend: 1 }
+    port7: 
+    port8: 
+    port9: 
+    mgmt0: { name: mgmt, peer: mgmtsw01, pport: NULL, type: mgmt, link: <link-id>, linkend: 2 }
+  border01:
+    port1: { name: gi1, peer: isp-rtr, pport: port1, type: ebgp, link: <link-id>, linkend: 2 }
+    port2: { name: gi2, peer: coresw01, pport: port1, type: routed, link: <link-id>, linkend: 2 }
+    port3: 
+    port4: { name: gi4, peer: mgmtsw01, pport: NULL, type: mgmt, link: <link-id>, linkend: 2 }
+  efw01:
+    port1: { name: port1, peer: mgmtsw01, pport: <port#>, type: mgmt, link: <link-id>, linkend: <1-2> }
+    port2: { name: port2, peer: coresw01, pport: <port#>, type: trunk, link: <link-id>, linkend: <1-2> }
+  elb01:
+    port1: { name: 1.1, peer: coresw01, pport: port6, type: trunk, link: <link-id>, linkend: 2 } 
+    port2: { name: 1.2, peer: coresw01, pport: port4, type: trunk, link: <link-id>, linkend: 2 }
+    port3: { name: mgmt, peer: mgmtsw01, pport: NULL , type: mgmt, link: <link-id>, linkend: 1 }
+  isp-rtr:
+    port1: { name: gi1, peer: border01, pport: port1, type: ebgp, link: <link-id>, linkend: 1 }
+    port2: { name: gi2, peer: inetclient1, pport: , type: [access, routed], link: <link-id>, linkend: 1 }
+  appsvr01:
+    port1: { name: ens3, peer: coresw01, pport: port3, type: access, link: , linkend: 2}
+  inetclient1:
+    port1: { name: ens3, peer: isp-rtr, pport: port2 , type: access, link: , linkend: 2 }

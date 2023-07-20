@@ -1,0 +1,42 @@
+---
+- name: Update AT4 WAN routes
+  hosts: dmvpn-spoke-g004
+  connection: network_cli
+  gather_facts: no
+  vars_files: Null
+  vars: Null 
+  tasks:
+    - name: Update Static Route Table
+      ios_static_routes:
+        config:
+          - vrf: DCI
+            address_families:
+            - afi: ipv4
+              routes:
+                - dest: "{{ item }}"
+                  next_hops:
+                  - forward_router_address: 10.155.16.81
+      loop: "{{ subnets }}"
+
+    - name: Delete Existing Prefix List
+      cisco.ios.ios_prefix_lists:
+        config: 
+          - afi: ipv4
+            prefix_lists:
+              - name: Local-LAB-Networks
+        state: deleted
+      
+    - name: Create Updated Prefix List
+      cisco.ios.ios_prefix_lists:
+        config: 
+          - afi: ipv4
+            prefix_lists:
+              - name: Local-LAB-Networks
+                description: Accept-only-these-routes-from-Network-Leafs
+                entries:
+                  - action: permit
+                    prefix: "{{ item }}"
+                    le: 32
+                    sequence: "{{ 50000000 | random(seed=item, start=500, step=22) }}"
+        state: merged
+      loop: "{{ subnets }}"

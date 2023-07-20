@@ -1,0 +1,17 @@
+---
+- name: Create Virtual Server
+  bigip_virtual_server:
+    provider: "{{ provider }}"
+    name: "{{ bigip_params.application_name }}_http"
+    type: standard
+    source: 0.0.0.0/0
+    destination: "{{ bigip_params.application_name }}"
+    port: "{{ port }}"
+    pool: "{{ bigip_params.pool }}"
+    snat: automap
+    profiles:
+      - tcp
+    irules:
+      - _sys_https_redirect
+    enabled_vlans: /Common/external
+  delegate_to: localhost

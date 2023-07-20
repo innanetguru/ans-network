@@ -1,0 +1,11 @@
+aaa:
+  group: ISE
+  servers:
+    - 10.9.18.32
+    - 10.194.18.232
+  key: nokey
+snmp:
+  servers:
+    - 10.9.18.137
+    - 10.9.1.149
+  

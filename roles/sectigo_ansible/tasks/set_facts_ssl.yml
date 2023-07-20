@@ -1,0 +1,71 @@
+---
+# Set facts specific for SSL certificates
+
+# Create ssl certificates folder if it does not exist
+- name: Check if "{{ sectigo_ssl_cert_file_path }}" folder exists
+  stat:
+    path: "{{ sectigo_ssl_cert_file_path }}"
+  register: certificate_folder
+  when: sectigo_ssl_cert_file_path is defined
+
+- name: Create "{{ sectigo_ssl_cert_file_path }}" folder
+  file:
+    path: "{{ sectigo_ssl_cert_file_path }}"
+    state: directory
+    mode: 0710
+    group: "{{ ansible_user }}"
+    owner: "{{ ansible_user }}"
+  when: certificate_folder.stat is defined and certificate_folder.stat.exists == false and sectigo_ssl_cert_file_path is defined
+
+# Check if private key file exists for SSL certificates
+- name: Check if private key file exists in the sectigo_ssl_cert_file_path folder
+  stat:
+    path: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.key"
+  register: certificate_private_key_file
+  when: sectigo_ssl_cert_file_path is defined and sectigo_ssl_cert_file_name is defined
+
+- name: Make a copy of the private key file if it exists
+  copy:
+    src: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.key"
+    remote_src: yes
+    mode: preserve
+    dest: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.key.bck"
+  when: certificate_private_key_file.stat is defined and certificate_private_key_file.stat.exists
+
+- name: Check if csr file exists in the sectigo_ssl_cert_file_path folder
+  stat:
+    path: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.csr"
+  register: certificate_csr_file
+  when: sectigo_ssl_cert_file_path is defined and sectigo_ssl_cert_file_name is defined
+
+- name: Check if ids file exists in the sectigo_ssl_cert_file_path folder
+  stat:
+    path: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.ids"
+  register: certificate_ids_file
+  when: sectigo_ssl_cert_file_path is defined and sectigo_ssl_cert_file_name is defined
+
+- name: Check if cert file exists in the sectigo_ssl_cert_file_path folder
+  stat:
+    path: "{{ sectigo_ssl_cert_file_path }}/{{ sectigo_ssl_cert_file_name }}.crt"
+  register: certificate_crt_file
+  when: sectigo_ssl_cert_file_path is defined and sectigo_ssl_cert_file_name is defined
+
+- name: Check if private key is missing but other files exist.
+  fail:
+    msg: >
+      The private key file is missing but the {{ sectigo_ssl_cert_file_path }} folder already contains some files:
+      {{ "{}.csr".format(sectigo_ssl_cert_file_name) if certificate_csr_file.stat is defined and certificate_csr_file.stat.exists else "" }}
+      {{ "{}.ids".format(sectigo_ssl_cert_file_name) if certificate_ids_file.stat is defined and certificate_ids_file.stat.exists else "" }}
+      {{ "{}.crt".format(sectigo_ssl_cert_file_name) if certificate_crt_file.stat is defined and certificate_crt_file.stat.exists else "" }}
+      You must delete the existing files in this folder or set the sectigo_force variable to true to generate a new
+      certificate.
+  when:
+    - not sectigo_force
+    - certificate_private_key_file.stat is defined
+    - not certificate_private_key_file.stat.exists
+    - sectigo_ssl_cert_file_path is defined
+    - sectigo_ssl_cert_file_name is defined
+    - certificate_csr_file.stat is defined and certificate_csr_file.stat.exists or
+      certificate_ids_file.stat is defined and certificate_ids_file.stat.exists or
+      certificate_crt_file.stat is defined and certificate_crt_file.stat.exists
+

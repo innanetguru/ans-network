@@ -1,0 +1,45 @@
+---
+- name: Test CRG Build from template
+  hosts: localhost
+  connection: smart
+  gather_facts: no 
+
+  tasks:
+    - name: Extract Data from CRG
+      read_csv:
+        delimiter: ','
+        dialect: excel
+        #fieldnames:
+         # - 'VIP'
+         # - 'Customer Facing FQDN'
+        path: 'test-crg.csv'
+        key: NAME
+      register: Data
+
+    - name: Print Data
+      debug:
+        #var: Data.dict
+        msg: "{{ Data.dict }}"
+    
+    - copy: 
+        content: "{{ Data | to_json }} "
+        dest: wf_vars_test.json
+        owner: innanetguru
+        mode: 0777
+
+- name: Test Accessing JSON vars_files
+  hosts: localhost
+  connection: smart
+  gather_facts: no 
+  vars_files: wf_vars_test.json
+  tasks:
+    - name: Print record 1
+      debug:
+        #msg: "{{ BP2_net1.SUBNET }}"
+        var: dict.BP2_net2.ENVIRONMENT
+
+    - name: with_dict example
+      ansible.builtin.debug:
+        msg: "{{ item.key }} - {{ item.value }}"
+      #with_dict: "{{ dict }}"
+      loop:  "{{ dict | dict2items }}"

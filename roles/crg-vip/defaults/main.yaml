@@ -1,0 +1,9 @@
+---
+lb_method: round-robin
+
+svr_monitors:
+  - http
+  - tcp
+
+svc_port: 443
+

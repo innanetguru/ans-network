@@ -1,0 +1,112 @@
+config system global
+    set hostname "efw01"
+end
+config system interface
+    edit "port1"
+        set vdom "root"
+        set description "management"
+        set mode static
+        set ip 192.168.0.171 255.255.255.0
+        set allowaccess ping https ssh http fgfm
+    next
+    edit "port2"
+        set vdom "root"
+        set type physical
+        set description "coresw01-1"
+    next
+    edit "port3"
+        set vdom "root"
+        set type physical
+        set description "coresw01-2"
+    next
+    edit "coresw01-1"
+        set vdom "root"
+        set vlanforward enable
+        set type aggregate
+        set member "port2"
+        set description "coresw01-PO"
+        set device-identification enable
+        set lldp-transmission enable
+    next
+    edit "coresw01-2"
+        set vdom "root"
+        set vlanforward enable
+        set type aggregate
+        set member "port3"
+        set description "coresw01-PO"
+        set device-identification enable
+        set lldp-transmission enable
+        set snmp-index 4
+    next
+    edit "vlan3"
+        set vdom "root"
+        set mode static 
+        set ip 192.168.192.2 255.255.255.248
+        set allowaccess ping
+        set interface coresw01-1
+        set vlanid 3
+    next
+    edit "vlan4"
+        set vdom root
+        set mode static
+        set ip 192.168.192.10 255.255.255.248
+        set allowaccess ping
+        set interface coresw01-1
+        set vlanid 4
+    next
+end
+config router static
+    edit 1
+        set gateway 192.168.192.1
+        set device "vlan3"
+        set comment "default-route"
+    next
+    edit 2
+        set dst 192.168.194.0 255.255.255.0
+        set gateway 192.168.192.9
+        set device "vlan4"
+        set comment "backend servers"
+    next
+    edit 3 
+        set dst 10.0.0.0 255.255.255.0
+        set gateway 192.168.192.1
+        set device "vlan3"
+        set comment "external client network"
+    next  
+end
+config firewall address
+    edit "192.168.192.0/29"
+        set associated-interface "vlan3"
+        set subnet 192.168.192.0 255.255.255.248
+    next
+    edit "192.168.192.8/29"
+        set associated-interface "vlan4"
+        set allow-routing enable
+        set subnet 192.168.192.8 255.255.255.248
+    next
+    edit "192.168.194.0/24"
+        set associated-interface "vlan4"
+        set allow-routing enable
+        set subnet 192.168.194.0 255.255.255.0
+    next
+end 
+config firewall policy
+    edit 1
+        set srcintf vlan4
+        set dstintf vlan3
+        set srcaddr 192.168.192.8/29
+        set dstaddr all
+        set action accept
+        set schedule always
+        set service ALL_ICMP
+    next
+    edit 2
+        set srcintf vlan4
+        set dstintf vlan3
+        set srcaddr 192.168.194.0/24
+        set dstaddr all
+        set action accept
+        set schedule always
+        set service DNS HTTP HTTPS ALL_ICMP SSH
+    next
+end

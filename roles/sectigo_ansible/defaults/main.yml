@@ -1,0 +1,207 @@
+---
+# defaults file for sectigo_ansible
+# Each variable for the role is described in this file.
+# When the variable is commented, the line is provided as an usage example.
+# Only uncommented variables are set with default values.
+
+
+# --------------------------------------------------------------------------------------------- #
+# General variables
+# --------------------------------------------------------------------------------------------- #
+
+# User ID to access the customer URI. 
+sectigo_cm_user: dgiardin
+
+# Password to access the customer URI. 
+sectigo_cm_password: "abc123/*"
+
+# Customer specific URI
+sectigo_cm_uri: otc
+
+# Customer's Organization ID (numeric)
+sectigo_cm_org_id: 123
+
+# The base URL of the Sectigo Certificate Authority
+# Note that this is different between SSL certificates and client (SMIME) certificates.
+sectigo_cm_base_url: "https://cert-manager.com/api/ssl/v1"  # For server SSL certificates the path contains ssl
+#sectigo_cm_base_url: "https://myorg.cert-manager.com/api/smime/v1" # For client certificates the path contains smime
+
+# --------------------------------------------------------------------------------------------- #
+# Behavioral variables
+# --------------------------------------------------------------------------------------------- #
+
+# If true, issue a new certificate even if there is already an existing one on the target server
+sectigo_force: false
+
+# "present" if you want to enroll and collect a certificate. "absent" to revoke a certificate.
+sectigo_state: present
+
+# --------------------------------------------------------------------------------------------- #
+# CSR Parameters
+# --------------------------------------------------------------------------------------------- #
+
+# Path where to find the certificate signing request.
+# If this is provided, then the subject parameters will be ignored
+sectigo_csr: "./ssl/myorg.csr"
+
+# The algorithm to use to generate the private key. Only RSA is supported
+sectigo_csr_key_algo: RSA
+
+# Size (in bits) of the TLS/SSL key to generate. Possible values: 2048, 3072, 4096.
+sectigo_csr_key_size: 2048
+
+# The elliptic curve to use to generate the private key. Mandatory if you select the ECC value for sectigo_key_algo.
+#sectigo_csr_key_elliptic_curve: secp521r1
+
+# Single value for a domain which is included in the certificate Common Name (CN) field
+sectigo_csr_domain: "otxlab.net"
+
+# Certificate signing request subject.
+# If this parameter is provided, then you generate the default RSA 2048 bit private key to be used for the CSR.
+#sectigo_csr_subject: "C=US/ST=OH/L=Brook Park/O=Engineering Lab Services/OU=CSD/CN=mydomain.com/emailAddress=admin@mydomain.com"
+
+# The country name which is included in the certificate Country (C) field
+sectigo_csr_country: "US"
+
+# The state name which is included in the certificate State (ST) field
+sectigo_csr_state: "OH"
+
+# The location name which is included in the certificate Location (L) field
+sectigo_csr_location: "Brook Park"
+
+# The organization name which is included in the certificate organization (O) field
+sectigo_csr_organization: "Engineering Lab Services"
+
+# The organization unit which is included in the certificate organization unit (OU) field
+sectigo_csr_organization_unit: "CSD"
+
+# The email address which is included in the certificate emailAddress field
+sectigo_csr_email_address: "network-ops-lab@otxlab.net"
+
+# --------------------------------------------------------------------------------------------- #
+# SSL Server certificates issuance variables
+# --------------------------------------------------------------------------------------------- #
+
+# List of subject alternative names (SAN).
+# Supported formats are those of the subject_alt_name parameter of the openssl_csr module.
+#sectigo_ssl_cert_subject_alt_names: ""
+
+# List of email addresses for the external requester
+sectigo_ssl_cert_external_requester: ""
+
+# Location where the certificate, csr, private key and enrollment ids are stored
+#sectigo_ssl_cert_file_path: "./mysslcerts"
+
+# Name of the certificate file. The same name is used for the private key, the csr.
+#sectigo_ssl_cert_file_name: "my_ssl_certificate"
+
+# Type of certificate (numeric).
+#sectigo_ssl_cert_type: 51
+
+# Certificate validity in days. Values are constrained by the choice of sectigo_ssl_cert_type.
+#sectigo_ssl_cert_validity: 365
+
+# Format type for SSL certificate (not used for client certificates).
+# Allowed values:
+#   'x509'    - for X509, Base64 encoded,
+#   'x509CO'  - for X509 Certificate only, Base64 encoded,
+#   'x509IO'  - for X509 Intermediates/root only, Base64 encoded,
+#   'base64'  - for PKCS#7 Base64 encoded,
+#   'bin'     - for PKCS#7 Bin encoded,
+#   'x509IOR' - for X509 Intermediates/root only Reverse, Base64 encoded.
+sectigo_ssl_cert_format_type: x509CO
+
+# The maximum time in seconds before a certificate download attempt will time out. Default is 600 seconds.
+sectigo_max_timeout: 600
+
+# The time in seconds between each attempt to download the issued certificate. Default is 30 seconds.
+sectigo_loop_period: 30
+
+# Comments for the certificate enrollment
+sectigo_ssl_cert_comments: ""
+
+# Number of server licenses. Required for the Wildcard products.
+sectigo_ssl_cert_num_servers: 0
+
+# Server type ID (numeric)
+sectigo_ssl_cert_server_type: -1
+
+# Custom fields for the ssl certificate
+# This variable is a list of dictionaries accepting name and value pairs
+# For example:
+# custom_fields:
+#       - { name: "custom field 1", value: "value1" }
+#       - { name: "custom field 2", value: "value2" }
+sectigo_ssl_cert_custom_fields: ""
+
+# Expiry window in days.
+# If the certificate is going to expire within this time window the role will generate a new certificate
+sectigo_ssl_cert_expiry_window: 7
+
+# Certificates gets auto renewed when this option is enabled
+sectigo_auto_renew: true
+
+# --------------------------------------------------------------------------------------------- #
+# SSL Server certificates revocation variables
+# --------------------------------------------------------------------------------------------- #
+
+# The Id of the SSL certificate to revoke.
+#sectigo_ssl_cert_ssl_id: 23140
+
+# --------------------------------------------------------------------------------------------- #
+# Client Certificate issuance variables
+# --------------------------------------------------------------------------------------------- #
+
+# Location where the certificate, csr, private key and enrollment ids are stored
+#sectigo_client_cert_file_path: "./myclientcerts"
+
+# Name of the certificate file. The same name is used for the private key, the csr.
+#sectigo_client_cert_file_name: "my_client_certificate"
+
+#  Person first name. FirstName + ' ' + middleName + ' ' + lastName must be in range of 1 to 64 characters.
+#sectigo_client_cert_first_name: "John"
+
+# Person middle name. FirstName + ' ' + middleName + ' ' + lastName must be in range of 1 to 64 character
+#sectigo_client_cert_middle_name: ""
+
+# Person last name. FirstName + ' ' + middleName + ' ' + lastName must be in range of 1 to 64 characters.
+#sectigo_client_cert_last_name: "Doe"
+
+# Person e-mail. Must be a well-formed email address. Must not be empty. Size must be between 0 and 256 characters.
+#sectigo_client_cert_email: "jdoe@myorg.com"
+
+# Type of certificate (numeric).
+#sectigo_client_cert_type: 51
+
+# Certificate validity in days. Values are constrained by the choice of sectigo_client_cert_type.
+#sectigo_client_cert_validity: 365
+
+# Custom fields for the clent certificate
+# This variable is a list of dictionaries accepting name and value pairs
+# For example:
+# custom_fields:
+#       - { name: "custom field 1", value: "value1" }
+#       - { name: "custom field 2", value: "value2" }
+sectigo_client_cert_custom_fields: "[]"
+
+# Expiry window in days.
+# If the certificate is going to expire within this time window the role will generate a new certificate
+sectigo_client_cert_expiry_window: 7
+
+# The sectigo_auto_renew parameter is shared accross SSL and Client certs
+
+# --------------------------------------------------------------------------------------------- #
+# Client Certificate revocation variables
+# --------------------------------------------------------------------------------------------- #
+
+# Order number of the certificate that has to be revoked
+#sectigo_client_cert_order_number: 24142
+
+
+# --------------------------------------------------------------------------------------------- #
+# Common revocation variables
+# --------------------------------------------------------------------------------------------- #
+
+# The reason why the certificate has to be revoked
+#sectigo_reason: "key compromised"
+

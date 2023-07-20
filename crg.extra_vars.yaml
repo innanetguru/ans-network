@@ -1,0 +1,38 @@
+---
+year: "2021"
+build_params:
+  custTag: "test-lab"
+  application_names: 
+    prod: test-lab-p01.7stacktech.com 
+    test: test-lab-t01.7stacktech.com 
+  shared_params:
+    custGrpVips:
+      - name: "192.168.194.12/32"
+        #desc: "test vip"
+      - name: "192.168.194.13/32"
+        #desc: "prod vip"
+  server_params:
+    prod:
+      - fqdn: gns-appsvr-p01.7stacktech.com 
+        ip: "192.168.194.100"
+        port: "80"
+      - fqdn: gns-appsvr-p02.7stacktech.com
+        ip: "192.168.194.101"
+        port: "80"
+    test:
+      - fqdn: gns-appsvr-t01.7stacktech.com 
+        ip: "192.168.194.102"
+        port: "80"
+      - fqdn: gns-appsvr-t02.7stacktech.com
+        ip: "192.168.194.103"
+        port: "80"
+  bigip_params:
+    pools: 
+      prod: prod-lab
+      test: test-lab
+
+
+cert_data:
+  commonName: 7stacktech.com
+  #certFile: "{{ cert_data.commonName }}_{{ year }}"
+  #keyFile: "{{ cert_data.commonName }}_{{ year }}"

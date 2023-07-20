@@ -1,0 +1,94 @@
+# Test playbook to bootstrap nodes with ansible
+# relies on this role: https://galaxy.ansible.com/robertdebock/bootstrap
+---
+- name: Prepare all hosts for ansible
+  hosts: all
+  become: yes
+  gather_facts: no
+  roles:
+    - robertdebock.bootstrap
+  tasks:
+    - name: test connection
+      ping:
+
+- name: Configure all hosts to use public key authentication only
+  hosts: all
+  become: yes
+  remote_user: vmartino
+  gather_facts: yes
+  vars:
+    ender_password: mypassword
+  tasks:
+    - name: Create ssh key
+      local_action:
+        module: openssh_keypair
+        path: "{{ keypair_path | default('/tmp/keys') }}"
+      register: keypair
+      become: no
+
+    - debug:
+        var: keypair
+
+    - name: Add a new user named ender
+      user:
+        name: ender
+        shell: /bin/sh
+        password: "{{ ender_password | password_hash('sha512','910487998qafsdaarfdAASDFAS') }}"
+
+    - name: Check sudoers config folder for FreeBSD exists
+      stat:
+        path: /usr/local/etc/sudoers.d
+      register: fbd_sudoers_folder
+      when: ansible_distribution == 'FreeBSD'
+
+    - name: Create sudoers config folder for FreeBSD if it does not exist
+      file:
+        path: /usr/local/etc/sudoers.d
+        state: directory
+        mode: 0755
+        group: root
+        owner: root
+      when: ansible_distribution == 'FreeBSD' and fbd_sudoers_folder.stat.exists == false
+
+    - name: Add ender user to the sudoers for FreeBSD
+      copy:
+        dest: "/usr/local/etc/sudoers.d/ender"
+        content: "ender  ALL=(ALL)  NOPASSWD: ALL"
+      when: ansible_distribution == 'FreeBSD'
+        
+    - name: Add ender user to the sudoers for Linux
+      copy:
+        dest: "/etc/sudoers.d/ender"
+        content: "ender  ALL=(ALL)  NOPASSWD: ALL"
+      when: ansible_distribution != 'FreeBSD'
+
+    - name: Deploy SSH Key
+      authorized_key: 
+        user: ender
+        state: present
+        key: "{{ keypair['public_key'] }}"
+
+    - name: Disable Password Authentication
+      lineinfile:
+        dest=/etc/ssh/sshd_config
+        regexp='^PasswordAuthentication'
+        line="PasswordAuthentication no"
+        state=present
+        backup=yes
+
+    - name: Disable Root Login
+      lineinfile:
+        dest=/etc/ssh/sshd_config
+        regexp='^PermitRootLogin'
+        line="PermitRootLogin no"
+        state=present
+        backup=yes
+      notify:
+        - restart ssh
+      
+  handlers:
+    - name: restart ssh
+      service:
+        name=sshd
+            state=restarted
+

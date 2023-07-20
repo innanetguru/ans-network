@@ -1,0 +1,11 @@
+# place variables for the common role here
+
+ntp_servers: 
+  - 'ntp.server.com'  
+  - '10.0.0.1'
+dns_servers: 
+  - 'dns.server.com'
+  - '10.0.0.2'
+snmp_servers: 
+  - 'snmp.server.com'
+  - '10.0.0.3'

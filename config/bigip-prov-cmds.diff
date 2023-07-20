@@ -1,0 +1,55 @@
+sys management-ip 192.168.0.172/24 {
+    description static-fallback
+}
+sys management-route default {
+    gateway 192.168.0.1
+    network default
+}
+net route Default {
+    description "for managing system and internet updates"
+    gw 192.168.192.10
+    network default
+}
+sys global-settings {
+    gui-setup disabled
+    hostname gns-elb01.otxlab.net
+    mgmt-dhcp disabled
+}
+net self app-servers-backend_selfIP {
+    address 192.168.194.1/24
+    allow-service all
+    traffic-group traffic-group-local-only
+    vlan backend_transit
+}
+net self Proxy_transit_selfIP {
+    address 192.168.192.11/29
+    allow-service all
+    traffic-group traffic-group-local-only
+    vlan proxy_transit
+}
+net vlan backend_transit {
+    description "application servers"
+    fwd-mode l3
+    if-index 128
+    interfaces {
+        1.2 { }
+    }
+    sflow {
+        poll-interval-global no
+        sampling-rate-global no
+    }
+    tag 5
+}
+net vlan proxy_transit {
+    description "L2/L3 link between bigip and external firewall"
+    fwd-mode l3
+    if-index 144
+    interfaces {
+        1.1 { }
+    }
+    sflow {
+        poll-interval-global no
+        sampling-rate-global no
+    }
+    tag 4
+}

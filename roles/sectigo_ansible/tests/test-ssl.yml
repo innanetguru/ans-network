@@ -1,0 +1,19 @@
+---
+- hosts: localhost 
+  roles:
+    - sectigo_ansible
+  vars:
+    sectigo_cm_base_url: 'https://cert-manager.com/api/ssl/v1'
+    sectigo_csr_subject: "C=CA/ST=ON/L=Ottawa/O=MyOrg/OU=Research/CN=myorg.com/emailAddress=example@myorg.com"
+    sectigo_ssl_cert_file_path: "./mysslcerts"
+    sectigo_ssl_cert_file_name: "test_ssl"
+    sectigo_ssl_cert_type: 51
+    sectigo_ssl_cert_validity: 365
+    sectigo_ssl_cert_format_type: x509CO
+    sectigo_ssl_cert_num_servers: 1
+    sectigo_ssl_cert_server_type: -1
+    sectigo_ssl_cert_comments: "Test certificate for Sectigo: {{ sectigo_ssl_cert_file_name }}"
+    sectigo_ssl_cert_expiry_window: 7
+    sectigo_auto_renew: true
+    sectigo_max_timeout: 600
+    sectigo_loop_period: 30

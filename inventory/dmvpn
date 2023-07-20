@@ -1,0 +1,17 @@
+[gns_hub]
+dmvpn-hub-g001 ansible_host=
+dmvpn-hub-g002 ansible_host=
+
+[gns_spoke]
+dmvpn-spoke-g001 ansible_host=
+dmvpn-spoke-g002 ansible_host=
+dmvpn-spoke-g003 ansible_host=
+dmvpn-spoke-g004 ansible_host=
+
+[all:vars]
+ansible_user=svc_ansible
+ansible_become=yes
+ansible_become_method=enable
+ansible_ssh_host_key_checking=no
+ansible_network_os=ios
+ansible_connection=network_cli

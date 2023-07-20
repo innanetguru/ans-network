@@ -1,0 +1,46 @@
+---
+# Install the prerequisite packages on the target hosts
+- include_tasks: install_prerequisites.yml
+  tags: [never, setup]
+
+# Set facts for the role execution and check preconditions for role execution
+- include_tasks: set_facts.yml
+
+# Set facts for ssl enrollment
+- include_tasks: set_facts_ssl.yml
+  when:
+    - sectigo_ssl_cert_file_path is defined or sectigo_ssl_cert_file_name is defined
+    - sectigo_state == 'present'
+
+# Enroll server certificate
+- include_tasks: enroll_ssl.yml
+  when:
+    - sectigo_state == 'present'
+    - sectigo_ssl_cert_server_type is defined
+    - sectigo_ssl_cert_file_path is defined
+
+# Set facts for SMIME enrollment
+- include_tasks: set_facts_smime.yml
+  when:
+    - sectigo_client_cert_file_path is defined or sectigo_client_cert_file_name is defined
+    - sectigo_state == 'present'
+
+# Enroll client certificate
+- include_tasks: enroll_smime.yml
+  when:
+    - sectigo_state == 'present'
+    - sectigo_client_cert_email is defined
+    - sectigo_client_cert_file_path is defined
+
+# Set facts based on the specific operation we want to perform
+- include_tasks: set_facts_revoke.yml
+  when: sectigo_state == 'absent'
+
+# Revoke server certificate
+- include_tasks: revoke_ssl.yml
+  when: sectigo_state == 'absent' and sectigo_ssl_cert_ssl_id is defined
+
+# Revoke client certificate
+- include_tasks: revoke_smime.yml
+  when: sectigo_state == 'absent' and sectigo_client_cert_order_number is defined
+

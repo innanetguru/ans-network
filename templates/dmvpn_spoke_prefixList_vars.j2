@@ -1,0 +1,5 @@
+prefixes:
+{% for prefix in subnets %}
+  - network_cidr: {{ prefix }}
+    sequence: {{ 5000000 | random(seed=prefix, start=500, step=22)}}
+{% endfor %}

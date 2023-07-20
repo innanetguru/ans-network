@@ -1,0 +1,89 @@
+---
+- name: Deploy VIP
+  hosts: "gns_fmgr"
+  collections:
+   - fortinet.fortimanager
+  connection: httpapi
+  gather_facts: False 
+  #pre-tasks:
+    #- include_vars: "{{ topology }}"
+
+  vars_files:
+    #- roles/crg-fortimgr/vars/main.yaml
+    #- roles/crg-fortimgr/defaults/main.yaml
+    #- group_vars/bp2_crg_fmgr/bp2_crg_fmgr.yaml
+  
+  #vars_prompt:
+   # - name: comment
+    #  prompt: Enter IM#/CR#/JIRA
+  
+  tasks:
+    - name: create address objects
+      fmgr_firewall_address:
+        state: present
+        enable_log: true
+        #ssl_verify: False 
+        #host: "{{ ansible_host }}"
+        adom: "{{ adom }}"    # required=true; current adom, role-default
+        firewall_address:
+          name: "{{ item.name }}"                            # pb.crg.yaml; passed in from cli
+          #associated_interface: "{{ int_interface }}"   # role vars;  
+          #comment:  "{{ comment }}"                     # prompted at runtime
+          subnet: "{{ item.name }}"                       # pb.crg.yaml; passed in from cli
+      loop: "{{ build_params.shared_params.custGrpVips }}"
+      ignore_errors: yes
+      register: error
+
+    - name: debug
+      ansible.builtin.debug:
+        msg: "{{ error }}"
+  
+    - name: Create Address group and add objects
+      fmgr_firewall_addrgrp:
+        bypass_validation: True
+        state: present
+        adom: "{{ adom }}" 
+        firewall_addrgrp:
+          #allow_routing: "enable"
+          comment: "comment"
+          name: "{{ build_params.custTag }}"
+          member: "{{ item.name }}" 
+      loop:  "{{ build_params.shared_params.custGrpVips }}" 
+
+
+    - name: Deploy Customer Policy
+      fmgr_pkg_firewall_policy:
+        adom: "{{ adom }}"
+        pkg: "{{ pkg }}"
+        state: present
+        pkg_firewall_policy:
+          policyid: 0
+          #comment: "{{ comment }}"
+          srcaddr: "all"        # source address or addrgrp name; type: list w/suboption dict/key
+          srcintf: "{{ interfaces.dci }}"         # Ingress Inft-name; type: list w/suboption dict/key
+          dstaddr: "{{ build_params.custTag }}"        # dest address or addrgrp name; type: list w/suboption dict/key
+          dstintf: "{{ interfaces.inside }}"        # egress Inft-name; type: list w/suboption dict/key
+          schedule:  always     #
+          service: "HTTPS"        #  service or service-group name; list w/suboption dict/key
+          action: accept
+          logtraffic: all 
+      ignore_errors: yes
+      register: error2
+
+    - name: debug
+      ansible.builtin.debug:
+        msg: "{{ error2 }}"
+
+    - name: Copy and install a policy package to devices.
+      fmgr_securityconsole_install_package:
+        #bypass_validation: False
+        #workspace_locking_adom: <value in [global, custom adom including root]>
+        #workspace_locking_timeout: 300
+        #rc_succeeded: [0, -2, -3, ...]
+        #rc_failed: [-2, -3, ...]
+        securityconsole_install_package:
+          adom: "{{ adom }}"
+          #adom_rev_comments: <value of string>
+          #adom_rev_name: <value of string>
+          #dev_rev_comments: <value of string>
+          pkg: "{{ pkg }}"

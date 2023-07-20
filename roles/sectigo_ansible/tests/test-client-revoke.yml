@@ -1,0 +1,9 @@
+---
+- hosts: localhost 
+  roles:
+    - sectigo_ansible
+  vars:
+    sectigo_cm_base_url: 'https://myca.cert-manager.com/api/smime/v1'
+    sectigo_client_cert_order_number: "12345"
+    sectigo_reason: Compromised certificate
+    sectigo_state: absent

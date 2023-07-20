@@ -1,0 +1,81 @@
+---
+- name: Deploy VIP
+  hosts: "efw01"
+  collections:
+   - fortinet.fortios
+  connection: httpapi
+  gather_facts: False 
+  #pre-tasks:
+    #- include_vars: "{{ topology }}"
+
+  vars_files:
+    - keys.yaml
+    - roles/crg-external-access/vars/main.yaml
+    - roles/crg-external-access/defaults/main.yaml
+  
+  vars_prompt:
+    - name: comment
+      prompt: Enter IM#/CR#/JIRA
+  
+  
+  tasks:
+    - name: create address objects
+      fortios_firewall_address:
+        state: present
+        #ssl_verify: False 
+        #https: False
+        #host: "{{ ansible_host }}"
+        firewall_address:
+          name: "{{ item.name  }}"                            # pb.crg.yaml; passed in from cli
+          associated_interface: "{{ interfaces.inside }}"   # role vars;  
+          #comment:  "{{ comment }}"                     # prompted at runtime
+          subnet: "{{ item.name }}"                       # pb.crg.yaml; passed in from cli
+          #list: 
+            #- ip: "{{ fortigate_params.vip[0] }}"
+      loop: "{{ build_params.shared_params.custGrpVips }}"
+      ignore_errors: yes
+      register: error
+
+    - name: debug
+      ansible.builtin.debug:
+        msg: "{{ error }}"
+
+    - name: Create Address group and add objects
+      fortios_firewall_addrgrp:
+        state: present
+        #ssl_verify: False 
+        #https: False
+        #host: "{{ ansible_host }}"
+        firewall_addrgrp:
+          allow_routing: "enable"
+          comment: "comment"
+          name: "{{ build_params.custTag }}"
+          member:  "{{ build_params.shared_params.custGrpVips }}"  
+            #- name: "{{ item }}" 
+      #loop: "{{ fortigate_params.vip_objects }}" 
+      ignore_errors: yes
+      register: error2
+
+    - name: debug
+      ansible.builtin.debug:
+        msg: "{{ error2 }}"
+
+    - name: Deploy Customer Policy
+      fortios_firewall_policy:
+        state: present
+        firewall_policy:
+          policyid: 0
+          #comment: "{{ comment }}"
+          srcaddr: 
+            - name: "all"    # source address or addrgrp name; type: list w/suboption dict/key
+          srcintf:        # Ingress Inft-name; type: list w/suboption dict/key
+            - name: "{{ interfaces.outside }}"
+          dstaddr:  
+            - name: "{{ build_params.custTag }}"        # dest address or addrgrp name; type: list w/suboption dict/key
+          dstintf:        # egress Inft-name; type: list w/suboption dict/key
+            - name:  "{{ interfaces.inside }}"
+          schedule:  "always"     #
+          service:        #  service or service-group name; list w/suboption dict/key
+            - name: "HTTPS"
+          action: "accept"
+          logtraffic: "all" 
