@@ -1,78 +1,94 @@
 {% if inventory_hostname == 'dmvpn-hub-g001' %}
 crypto ikev2 keyring AWS-KEYRING
- peer {{ dmvpn_hub_g001.remote_peer.vpn_conn_id }}
-  address {{ dmvpn_hub_g001.remote_peer.public_ip }}
-  pre-shared-key {{ dmvpn_hub_g001.remote_peer.psk }}
+{% for peer in dmvpn_hub_g001.tunnels %}
+ peer {{ peer.ikev2_peer }}
+  address {{ peer.ikev2_peer }}
+  pre-shared-key {{ peer.psk }}
+{% endfor %}
 {% elif inventory_hostname == 'dmvpn-hub-g002' %}
 crypto ikev2 keyring AWS-KEYRING
- peer {{ dmvpn_hub_g002.remote_peer.vpn_conn_id }}
-  address {{ dmvpn_hub_g002.remote_peer.public_ip }}
-  pre-shared-key {{ dmvpn_hub_g002.remote_peer.psk }}
+{% for peer in dmvpn_hub_g002.tunnels %}
+ peer {{ peer.ikev2_peer }}
+  address {{ peer.ikev2_peer }}
+  pre-shared-key {{ peer.psk }}
+{% endfor %}
 {% endif %}
 
 
 {% if inventory_hostname == 'dmvpn-hub-g001' %}
 crypto ikev2 profile AWS-IKEv2-PROFILE
- match identity remote address {{ dmvpn_hub_g001.remote_peer.public_ip }} 255.255.255.255 
+{% for peer in dmvpn_hub_g001.tunnels %}
+ match identity remote address {{ peer.ikev2_peer }} 255.255.255.255 
+{% endfor %}
 {% elif inventory_hostname == 'dmvpn-hub-g002' %}
 crypto ikev2 profile AWS-IKEv2-PROFILE
- match identity remote address {{ dmvpn_hub_g002.remote_peer.public_ip }} 255.255.255.255 
+{% for peer in dmvpn_hub_g002.tunnels %}
+ match identity remote address {{ peer.ikev2_peer }} 255.255.255.255 
+{% endfor %}
 {% endif %}
 
 {% if inventory_hostname == 'dmvpn-hub-g001' %}
-interface Tunnel{{ ansible_net_interfaces | tunnelid(seed=jira, step=1, start=30, end=40) }}
+{% for peer in dmvpn_hub_g001.tunnels %}
+interface Tunnel{{ ansible_net_interfaces | tunnelid(seed=peer.ikev2_peer, step=1, start=30, end=40) }}
  vrf forwarding DCI
- ip address {{ dmvpn_hub_g001.local_peer.private_ip }} {{ dmvpn_hub_g001.local_peer.private_ipmask }}
+ ip address {{ peer.ipsec_local }} {{ peer.gre_mask }}
  ip mtu 1400
  ip tcp adjust-mss 1360
  tunnel source Port-channel10
  tunnel mode ipsec ipv4
- tunnel destination {{ dmvpn_hub_g001.remote_peer.public_ip }}
+ tunnel destination {{ peer.ikev2_peer }}
  tunnel vrf FVRF-INET
  tunnel protection ipsec profile AWS-IPSEC-PROFILE
+{% endfor %}
 {% elif inventory_hostname == 'dmvpn-hub-g002' %}
-interface Tunnel{{ ansible_net_interfaces | tunnelid(seed=jira, step=1, start=30, end=40) }}
+{% for peer in dmvpn_hub_g002.tunnels %}
+interface Tunnel{{ ansible_net_interfaces | tunnelid(seed=peer.ikev2_peer, step=1, start=30, end=40) }}
  vrf forwarding DCI
- ip address {{ dmvpn_hub_g002.local_peer.private_ip }} {{ dmvpn_hub_g002.local_peer.private_ipmask }}
+ ip address {{ peer.ipsec_local }} {{ peer.gre_mask }}
  ip mtu 1400
  ip tcp adjust-mss 1360
  tunnel source Port-channel10
  tunnel mode ipsec ipv4
- tunnel destination {{ dmvpn_hub_g002.remote_peer.public_ip }}
+ tunnel destination {{ peer.ikev2_peer }}
  tunnel vrf FVRF-INET
  tunnel protection ipsec profile AWS-IPSEC-PROFILE
+{% endfor %}
 {% endif %}
 
+router bgp 65110
+ address-family ipv4 vrf DCI
 {% if inventory_hostname == 'dmvpn-hub-g001' %}
-router bgp 65110
- address-family ipv4 vrf DCI
-  neighbor {{ dmvpn_hub_g001.remote_peer.private_ip }} remote-as {{ dmvpn_hub_g001.remote_peer.asn }}
-  neighbor {{ dmvpn_hub_g001.remote_peer.private_ip }} activate
-  neighbor {{ dmvpn_hub_g001.remote_peer.private_ip }} soft-reconfiguration inbound
-  neighbor {{ dmvpn_hub_g001.remote_peer.private_ip }} prefix-list AWS_IN in
-  neighbor {{ dmvpn_hub_g001.remote_peer.private_ip }} prefix-list AWS_OUT out
- exit-address-family
+{% for peer in dmvpn_hub_g001.tunnels %}
+  neighbor {{ peer.ipsec_peer }} remote-as {{ peer.asn }}
+  neighbor {{ peer.ipsec_peer }} activate
+  neighbor {{ peer.ipsec_peer }} soft-reconfiguration inbound
+  neighbor {{ peer.ipsec_peer }} route-map AWS_INBOUND in
+  neighbor {{ peer.ipsec_peer }} route-map AWS_OUTBOUND out
+{% endfor %}
 {% elif inventory_hostname == 'dmvpn-hub-g002' %}
-router bgp 65110
- address-family ipv4 vrf DCI
-  neighbor {{ dmvpn_hub_g002.remote_peer.private_ip }} remote-as {{ dmvpn_hub_g002.remote_peer.asn }}
-  neighbor {{ dmvpn_hub_g002.remote_peer.private_ip }} activate
-  neighbor {{ dmvpn_hub_g002.remote_peer.private_ip }} soft-reconfiguration inbound
-  neighbor {{ dmvpn_hub_g002.remote_peer.private_ip }} prefix-list AWS_IN in
-  neighbor {{ dmvpn_hub_g002.remote_peer.private_ip }} prefix-list AWS_OUT out
- exit-address-family
+{% for peer in dmvpn_hub_g002.tunnels %}
+  neighbor {{ peer.ipsec_peer }} remote-as {{ peer.asn }}
+  neighbor {{ peer.ipsec_peer }} activate
+  neighbor {{ peer.ipsec_peer }} soft-reconfiguration inbound
+  neighbor {{ peer.ipsec_peer }} route-map AWS_INBOUND in
+  neighbor {{ peer.ipsec_peer }} route-map AWS_OUTBOUND out
+{% endfor %}
 {% endif %}
+ exit-address-family
 
-no ip prefix-list AWS_OUT
+no ip prefix-list AWS-LAB-Networks
 
 {% for prefix in aws_prefixes %}
-ip prefix-list AWS_OUT seq {{ 50000000 | random(seed=prefix, start=500, step=22) }} permit {{ prefix }} le 32
+ip prefix-list AWS-LAB-Networks seq {{ 50000000 | random(seed=prefix, start=500, step=22) }} permit {{ prefix }} le 32
 {% endfor %}
 
+ip access-list extended DMVPN_PEERS
 {% if inventory_hostname == 'dmvpn-hub-g001'  %}
-ip access-list extended DMVPN_PEERS
-  permit ip host {{ dmvpn_hub_g001.remote_peer.public_ip}} host {{ dmvpn_hub_public1 }}
+{% for peer in dmvpn_hub_g001.tunnels %}
+  permit ip host {{ peer.ikev2_peer}} host 204.90.140.68
+{% endfor %}
 {% elif inventory_hostname == 'dmvpn-hub-g002' %}
-ip access-list extended DMVPN_PEERS
-  permit ip host {{ dmvpn_hub_g002.remote_peer.public_ip}} host {{ dmvpn_hub_public2 }}
+{% for peer in dmvpn_hub_g002.tunnels %}
+  permit ip host {{ peer.ikev2_peer}} host 204.90.140.69
+{% endfor %}
 {% endif %}

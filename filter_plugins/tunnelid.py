@@ -30,46 +30,39 @@ class FilterModule(object):
         }
     
     def tunnelid(self, interfaces, seed=None, step=None, start=1, end=2147483647):
+        if seed is None:
+            r = random.SystemRandom()
+        else:
+            r = random.Random(seed)
         if not step:
             step = 1
+        i = 0                                        # loop counter to force exit
         interface_list=list(interfaces.keys())
-        tunnels=[]
+        tunnels=[x for x in interface_list if 'Tun' in x]
         ids=[]
-        #tunnelID=None
+        tunnelID=None
+        do_exit='Cannot Generate Tunnel ID for this task. Try using a different seed value'
         ''' Discard PHYS interfaces and create list of tunnel interface names'''
-        for i in interface_list:
-            if i.startswith('Tun'):
-                tunnels.append(i)
-            else:
-                tunnelID=r.randrange(start,end,step)
-                tunnelID=str(tunnelID)
-                return tunnelID
+        if len(tunnels) == 0:
+            tunnelID = 1
+            return tunnelID
         '''split ID from 'tunnel' and convert to integer list'''  
         for t in tunnels:
             id=t.split('l')
             ids.append(id[1])
         ids=list(map(int, ids))
         '''Generate unique tunnelID and return'''
-        if seed is not None:
-            r = random.Random(seed)
+        while tunnelID is None:
+            i = i + 1
             tunnelID=r.randrange(start,end,step)
-        elif tunnelID in ids:
-            seed = random.seed(a=seed + random.ranint(1, 1000000))
-            
-
-        while tunnelID in ids:
-            if seed is None:
-                seed = seed + random.randint(1,10000)
-                r=random.Random(seed)
-                tunnelID=r.randrange(start,end,step)
-                if tunnelID in ids:
-                    continue
+            if i >= 10:
+                return do_exit
+            elif tunnelID in ids:
+                tunnelID=None
+                continue
             else:
-                
-        else:
-            tunnelID=str(tunnelID)
-            return tunnelID
-
+                tunnelID=str(tunnelID)
+                return tunnelID
 
 
 ''' tunnelid receives ansible_net_interfaces from ansible_facts:
