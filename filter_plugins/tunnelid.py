@@ -85,7 +85,7 @@ ansible_net_interfaces= {
             "duplex": "Full",
             "ipv4": [
                 {
-                    "address": "10.9.1.21",
+                    "address": "192.168.1.21",
                     "subnet": "24"
                 }
             ],
@@ -98,7 +98,7 @@ ansible_net_interfaces= {
         },
         "GigabitEthernet0/0/0": {
             "bandwidth": 1000000,
-            "description": "bp2-lfsw01-l001-Eth1/14",
+            "description": "lfsw01-l001-Eth1/14",
             "duplex": "Full",
             "ipv4": [],
             "lineprotocol": "up",
@@ -110,7 +110,7 @@ ansible_net_interfaces= {
         },
         "GigabitEthernet0/0/1": {
             "bandwidth": 1000000,
-            "description": "bp2-lfsw01-l002-Eth1/14",
+            "description": "lfsw01-l002-Eth1/14",
             "duplex": "Full",
             "ipv4": [],
             "lineprotocol": "up",
@@ -122,11 +122,11 @@ ansible_net_interfaces= {
         },
         "GigabitEthernet0/0/2": {
             "bandwidth": 1000000,
-            "description": "bp2-lfsw01-l001-Eth1/16",
+            "description": "lfsw01-l001-Eth1/16",
             "duplex": "Full",
             "ipv4": [
                 {
-                    "address": "10.9.8.242",
+                    "address": "192.168.8.242",
                     "subnet": "30"
                 }
             ],
@@ -139,11 +139,11 @@ ansible_net_interfaces= {
         },
         "GigabitEthernet0/0/3": {
             "bandwidth": 1000000,
-            "description": "bp2-lfsw01-l002-Eth1/16",
+            "description": "lfsw01-l002-Eth1/16",
             "duplex": "Full",
             "ipv4": [
                 {
-                    "address": "10.9.8.246",
+                    "address": "192.168.8.246",
                     "subnet": "30"
                 }
             ],
@@ -160,7 +160,7 @@ ansible_net_interfaces= {
             "duplex": null,
             "ipv4": [
                 {
-                    "address": "10.9.8.253",
+                    "address": "192.168.8.253",
                     "subnet": "32"
                 }
             ],
@@ -173,11 +173,11 @@ ansible_net_interfaces= {
         },
         "Port-channel10": {
             "bandwidth": 2000000,
-            "description": "bp2-lfsw01-l001-l002-Po (vPC)",
+            "description": "lfsw01-l001-l002-Po (vPC)",
             "duplex": null,
             "ipv4": [
                 {
-                    "address": "204.90.140.69",
+                    "address": "134.228.78.69",
                     "subnet": "29"
                 }
             ],
