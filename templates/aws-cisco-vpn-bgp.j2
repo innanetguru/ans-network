@@ -85,10 +85,10 @@ ip prefix-list AWS-LAB-Networks seq {{ 50000000 | random(seed=prefix, start=500,
 ip access-list extended DMVPN_PEERS
 {% if inventory_hostname == 'dmvpn-hub-g001'  %}
 {% for peer in dmvpn_hub_g001.tunnels %}
-  permit ip host {{ peer.ikev2_peer}} host 204.90.140.68
+  permit ip host {{ peer.ikev2_peer}} host {{ on_prem_hub1}}
 {% endfor %}
 {% elif inventory_hostname == 'dmvpn-hub-g002' %}
 {% for peer in dmvpn_hub_g002.tunnels %}
-  permit ip host {{ peer.ikev2_peer}} host 204.90.140.69
+  permit ip host {{ peer.ikev2_peer}} host {{ on_prem_hub2}}
 {% endfor %}
 {% endif %}
